@@ -178,8 +178,16 @@ button:disabled { opacity: 0.35; cursor: default; }
 .end-hatched .new { font-size: 3.4rem; display: inline-block; animation: hop 0.6s ease-out 3; }
 
 /* ---- Stickers ---- */
-.sticker-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 14px 0; overflow-y: auto; }
-.sticker-grid span { font-size: 2.6rem; text-align: center; background: rgba(255,255,255,0.7); border-radius: 18px; padding: 6px 0; }
+.sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 6px; overflow-y: auto; align-content: start; }
+.sticker-grid span { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; border-radius: 22px; }
+.sticker-grid span.got { background: rgba(255,255,255,0.55); transform: rotate(var(--tilt, 0deg)); }
+.sticker-grid span.empty { background: rgba(255,255,255,0.3); box-shadow: inset 0 0 0 2px rgba(201,182,255,0.5); }
+.sticker-grid span img { width: 100%; height: 100%; object-fit: contain; }
+.sticker-grid span.empty img { opacity: 0.7; }
+.sticker-note { text-align: center; margin: 4px 0 0; color: var(--ink); }
+#sticker-screen.felt-book { background: url('../assets/art/sticker-book.webp') center / cover no-repeat; }
+#sticker-screen.felt-book .sticker-grid span.got, #sticker-screen.felt-book .sticker-grid span.empty { background: transparent; box-shadow: none; }
+.end-sticker img { width: 150px; height: 150px; object-fit: contain; }
 
 /* ---- Start gate ---- */
 .start-gate {

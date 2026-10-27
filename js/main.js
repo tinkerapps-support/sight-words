@@ -16,7 +16,15 @@ const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 // Placeholder creatures until Codex's art lands: one per word, by list position.
 const CREATURES = ['🐰', '🐱', '🐹', '🐲', '🐸', '🦊', '🐦', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐵', '🐧', '🐤', '🦉', '🦋', '🐢', '🐙', '🦔', '🐿️', '🐳', '🦄'];
+// Sticker N (1-20) is Codex's sticker-NN art; the emoji is the fallback and matches its subject.
 const STICKERS = ['🌈', '⭐', '🦄', '🌸', '🍓', '🧁', '🎀', '💖', '🌟', '🍭', '🦋', '🌷', '🍩', '🎈', '🐚', '🌙', '☁️', '🍦', '🪄', '👑'];
+const STICKER_PAGE = 20;
+// Older saves stored only the emoji; map it back to its number.
+const stickerNum = s => s.n || STICKERS.indexOf(s.id) + 1 || 1;
+const stickerHtml = n => {
+  const src = art(`sticker-${String(n).padStart(2, '0')}`);
+  return src ? img(src) : STICKERS[(n - 1) % STICKERS.length];
+};
 
 let state = load();
 let page = 0;              // which list's meadow is showing
@@ -214,6 +222,8 @@ function startSession(kind) {
   if (state.settings.wakeLock) device.keepAwake(true);
   go('play');
   showCard();
+  // A brand-new word opens with its own intro lines; otherwise greet the game.
+  if (kind === 'learn' && !card?.intro) audio.say('session-start', "Let's read some words!");
 }
 
 function renderMeter(full = false) {
@@ -307,10 +317,13 @@ $('btn-hint').addEventListener('click', () => {
   else sayWord();
 });
 $('btn-say').addEventListener('click', sayWord);
-function sayWord() {
+// Model, then lead: the word, then an invitation to say it back.
+async function sayWord() {
   if (!card) return;
+  const word = card.word;
   card.shown.add('say');
-  audio.say(wordId(card.word), card.word);
+  await audio.say(wordId(word), word);
+  if (card?.word === word && !busy) audio.say('say-it-again', 'Can you say it too?');
 }
 
 ['notyet', 'got', 'fast'].forEach(r => $(`btn-${r}`).addEventListener('click', () => answer(r)));
@@ -617,13 +630,13 @@ function endSession() {
   card = null;
   device.keepAwake(false);
   if (mode === 'meet') { go('settings'); return; }
-  const sticker = STICKERS[state.stickers.length % STICKERS.length];
-  state.stickers.push({ t: Date.now(), id: sticker });
+  const n = (state.stickers.length % STICKERS.length) + 1;
+  state.stickers.push({ t: Date.now(), n, id: STICKERS[n - 1] });
   state.sessions.push({ t: Date.now(), cards: sessionStats.cards, correct: sessionStats.correct, fast: sessionStats.fast });
   if (state.sessions.length > 400) state.sessions.splice(0, state.sessions.length - 400);
   persist();
   $('end-title').textContent = pick(['Great reading!', 'You did it!', 'Super reading!']);
-  $('end-sticker').textContent = sticker;
+  $('end-sticker').innerHTML = stickerHtml(n);
   $('end-hatched').innerHTML = sessionStats.hatched.length
     ? `New friend${sessionStats.hatched.length > 1 ? 's' : ''}! ${sessionStats.hatched.map(w => `<span class="new">${creatureFor(w)}</span>`).join(' ')}`
     : '';
@@ -631,12 +644,21 @@ function endSession() {
   setMascot($('end-mascot'), 'cheer');
   // Hatches were already celebrated as they happened; the end screen is about the sticker.
   audio.chime.sticker();
-  audio.say('sticker', 'You earned a sticker!');
+  audio.say('session-end', 'You read so many words!').then(() => {
+    if (!$('end-screen').hidden) audio.say('sticker', 'You earned a sticker!');
+  });
 }
 $('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
 
 function renderStickers() {
-  $('sticker-grid').innerHTML = state.stickers.map(s => `<span>${s.id}</span>`).join('') || '<p>Finish a game to earn a sticker!</p>';
+  // A book of 20-sticker pages: earned stickers in order, then empty stitched spots.
+  const earned = state.stickers.map(stickerNum);
+  const spots = Math.max(STICKER_PAGE, Math.ceil(earned.length / STICKER_PAGE) * STICKER_PAGE);
+  const locked = art('sticker-locked');
+  $('sticker-grid').innerHTML = Array.from({ length: spots }, (_, i) => i < earned.length
+    ? `<span class="got" style="--tilt:${((i * 37) % 13) - 6}deg">${stickerHtml(earned[i])}</span>`
+    : `<span class="empty">${locked ? img(locked) : ''}</span>`).join('');
+  $('sticker-note').textContent = earned.length ? '' : 'Finish a game to earn your first sticker!';
 }
 
 // ---------------------------------------------------------------- grown-up: head start
@@ -809,6 +831,7 @@ document.querySelectorAll('[data-icon]').forEach(el => {
   if (src) { el.innerHTML = img(src); el.classList.add('felt'); }
 });
 if (art('hatch-bg')) $('hatch').classList.add('felt-bg');
+if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
