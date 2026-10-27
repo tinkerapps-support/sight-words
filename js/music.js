@@ -57,7 +57,7 @@ function ensureBus() {
   lowpass.type = 'lowpass';
   lowpass.frequency.value = 3200;
   // A short echo gives the bells a little room.
-  const delay = ctx.createDelay(1);
+  const delay = ctx.createDelay(2);
   delay.delayTime.value = EIGHTH * 3;
   const feedback = ctx.createGain();
   feedback.gain.value = 0.28;
