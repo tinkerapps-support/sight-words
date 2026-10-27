@@ -1,0 +1,560 @@
+// Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
+import { CONFIG, LEVEL_NAMES } from './config.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey } from './engine.js';
+import { LISTS, listById, activeWords, wordEntry } from './lists.js';
+import { load, save, record, exportText, importText, defaultState } from './storage.js';
+import * as audio from './audio.js';
+import { wordId, sentenceId, cheerId, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
+import * as device from './device.js';
+import { art } from './art.js';
+
+const $ = id => document.getElementById(id);
+// Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
+const show = text => text.toLowerCase().replace(/\bi\b/g, 'I');
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// Placeholder creatures until Codex's art lands: one per word, by list position.
+const CREATURES = ['🐰', '🐱', '🐹', '🐲', '🐸', '🦊', '🐦', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐵', '🐧', '🐤', '🦉', '🦋', '🐢', '🐙', '🦔', '🐿️', '🐳', '🦄'];
+const STICKERS = ['🌈', '⭐', '🦄', '🌸', '🍓', '🧁', '🎀', '💖', '🌟', '🍭', '🦋', '🌷', '🍩', '🎈', '🐚', '🌙', '☁️', '🍦', '🪄', '👑'];
+
+let state = load();
+let page = 0;              // which list's meadow is showing
+let mode = 'learn';        // 'learn' | 'meet'
+let session = null;
+let card = null;           // { word, level, shown: Set, start, timers: [] }
+let undoStack = [];
+let sessionStats = null;
+let busy = false;
+
+const persist = () => save(state);
+const img = src => `<img src="${src}" alt="" draggable="false">`;
+const creatureFor = word => {
+  const src = art(`creature-${word.toLowerCase()}`);
+  if (src) return img(src);
+  for (const list of LISTS) {
+    const i = list.words.findIndex(w => w.word === word);
+    if (i >= 0) return CREATURES[i % CREATURES.length];
+  }
+  return '🐣';
+};
+const eggFor = stage => {
+  const src = art(`egg-${stage}`);
+  return src ? img(src) : `<span class="egg ${stage ? 's' + stage : ''}"></span>`;
+};
+const levelOf = word => state.words[word]?.level ?? 0;
+
+// ---------------------------------------------------------------- navigation
+
+const SCREENS = ['home', 'play-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+function go(name) {
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', stickers: 'sticker-screen', play: 'play-screen', end: 'end-screen' }[name] || name;
+  for (const s of SCREENS) $(s).hidden = s !== id;
+  if (id === 'home') renderHome();
+  if (id === 'setup-screen') renderSetup();
+  if (id === 'settings-screen') renderSettings();
+  if (id === 'progress-screen') renderProgress();
+  if (id === 'sticker-screen') renderStickers();
+}
+document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => go(b.dataset.back)));
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+
+function confirmBox(text) {
+  return new Promise(resolve => {
+    $('confirm-text').textContent = text;
+    $('confirm').hidden = false;
+    const finish = v => { $('confirm').hidden = true; $('confirm-yes').onclick = $('confirm-no').onclick = null; resolve(v); };
+    $('confirm-yes').onclick = () => finish(true);
+    $('confirm-no').onclick = () => finish(false);
+  });
+}
+
+// ---------------------------------------------------------------- start
+
+$('start').addEventListener('click', async () => {
+  audio.unlock();
+  audio.configure(state.settings);
+  if (state.settings.fullscreen) await device.enterFullscreen();
+  $('start-gate').hidden = true;
+  go(state.setupDone ? 'home' : 'setup');
+});
+
+// ---------------------------------------------------------------- home / meadow
+
+function renderHome() {
+  const enabled = LISTS.filter(l => state.settings.lists.includes(l.id));
+  page = Math.min(page, enabled.length - 1);
+  const list = enabled[page] || LISTS[0];
+  $('meadow-title').textContent = enabled.length > 1 ? `Rainbow Meadow · ${list.name}` : 'Rainbow Meadow';
+  $('page-prev').style.visibility = page > 0 ? 'visible' : 'hidden';
+  $('page-next').style.visibility = page < enabled.length - 1 ? 'visible' : 'hidden';
+  const m = $('meadow');
+  m.innerHTML = '';
+  let hatched = 0;
+  for (const e of list.words) {
+    const lvl = levelOf(e.word);
+    const isHatched = state.hatched.includes(e.word);
+    const b = document.createElement('button');
+    b.className = 'friend' + (isHatched ? ' hatched' : '') + (isHatched && lvl >= 5 ? ' mastered' : '');
+    if (isHatched) {
+      hatched++;
+      b.innerHTML = creatureFor(e.word);
+      b.setAttribute('aria-label', show(e.word));
+      b.addEventListener('click', () => { audio.say(wordId(e.word), e.word); b.classList.remove('cheer'); void b.offsetWidth; });
+    } else {
+      const stage = lvl >= 3 ? 3 : lvl >= 2 ? 2 : lvl >= 1 ? 1 : 0;
+      b.innerHTML = eggFor(stage);
+      if (stage) b.classList.add('wobble' + stage);
+      b.setAttribute('aria-label', 'egg');
+    }
+    m.appendChild(b);
+  }
+  $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
+  $('sticker-count').textContent = state.stickers.length;
+  $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
+}
+$('page-prev').addEventListener('click', () => { page--; renderHome(); });
+$('page-next').addEventListener('click', () => { page++; renderHome(); });
+$('fs-again').addEventListener('click', async () => { await device.enterFullscreen(); renderHome(); });
+device.onFullscreenChange(() => { if (!$('home').hidden) renderHome(); if (!$('settings-screen').hidden) renderSettings(); });
+$('stickers-btn').addEventListener('click', () => go('stickers'));
+
+// Grown-up gate: hold the gear for 3 s.
+{
+  const gear = $('gear');
+  let t = null;
+  const cancel = () => { clearTimeout(t); t = null; gear.classList.remove('holding'); };
+  gear.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    gear.classList.add('holding');
+    t = setTimeout(() => { cancel(); go('settings'); }, 3000);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => gear.addEventListener(ev, cancel));
+  gear.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+$('play').addEventListener('click', async () => {
+  audio.unlock();
+  if (state.settings.fullscreen) await device.enterFullscreen();
+  startSession('learn');
+});
+
+// ---------------------------------------------------------------- play
+
+function entries() {
+  return activeWords(state.settings.lists);
+}
+
+function startSession(kind) {
+  mode = kind;
+  const ents = entries();
+  let queue, clash;
+  if (kind === 'meet') {
+    queue = ents.filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).map(e => e.word);
+    if (!queue.length) { go('settings'); return; }
+  } else {
+    const built = buildSession({
+      records: state.words, entries: ents, now: Date.now(),
+      length: CONFIG.sessionLength[state.settings.sessionLength] || CONFIG.sessionLength.normal,
+    });
+    queue = built.queue;
+    clash = built.clash;
+  }
+  session = new Session({ queue, clash });
+  sessionStats = { cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
+  undoStack = [];
+  audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
+  renderMeter();
+  if (state.settings.wakeLock) device.keepAwake(true);
+  go('play');
+  showCard();
+}
+
+function renderMeter(full = false) {
+  const m = $('meter');
+  m.innerHTML = '';
+  for (let i = 0; i < CONFIG.meterBands; i++) {
+    const b = document.createElement('i');
+    if (full || i < state.meter) b.className = 'on';
+    m.appendChild(b);
+  }
+  m.classList.toggle('full', full);
+}
+
+function setMascot(el, mood) {
+  el.className = el.className.replace(/\b(idle|think|cheer|gentle)\b/g, '').trim() + ' ' + mood;
+  const src = art(`mascot-${mood}`);
+  if (src) el.innerHTML = img(src);
+}
+
+function clearTimers() {
+  if (card) card.timers.forEach(clearTimeout);
+}
+
+function showCard() {
+  clearTimers();
+  $('teach-next').hidden = true;
+  $('parent-strip').hidden = false;
+  $('parent-strip').classList.remove('locked');
+  $('btn-undo').disabled = !undoStack.length;
+  if (session.done) { endSession(); return; }
+  const word = session.current;
+  const level = levelOf(word);
+  card = { word, level, shown: new Set(), start: performance.now(), timers: [] };
+  const w = $('word');
+  const text = show(word);
+  w.innerHTML = `<span class="first">${text[0]}</span>${text.slice(1)}`;
+  $('hint').hidden = true;
+  $('card').classList.remove('teach');
+  $('card').classList.remove('pop'); void $('card').offsetWidth; $('card').classList.add('pop');
+  setMascot($('play-mascot'), 'think');
+  $('btn-hint').disabled = mode === 'meet';
+  if (mode === 'learn') {
+    // A brand-new word (level 0) gets the full Learning help.
+    const plan = CONFIG.hints[Math.max(1, level)] || {};
+    for (const [kind, at] of Object.entries(plan)) {
+      card.timers.push(setTimeout(() => showHint(kind, level === 3 && kind === 'sparkle'), at));
+    }
+  }
+}
+
+function showHint(kind, faint = false) {
+  if (!card) return;
+  card.shown.add(kind);
+  if (kind === 'sparkle') {
+    const f = $('word').querySelector('.first');
+    f.classList.add('sparkle');
+    f.classList.toggle('faint', faint);
+  } else if (kind === 'sentence') {
+    renderSentence(card.word);
+  }
+}
+
+function renderSentence(word) {
+  const e = wordEntry(word);
+  if (!e) return;
+  const re = new RegExp(`\\b(${word})\\b`, 'gi');
+  $('hint-sentence').innerHTML = show(e.sentence).replace(re, m => `<b>${m}</b>`);
+  const pic = art(`sentence-${word.toLowerCase()}`);
+  $('hint-art').innerHTML = pic ? img(pic) : creatureFor(word);
+  $('hint-sentence').onclick = () => audio.say(sentenceId(word), e.sentence);
+  $('hint').hidden = false;
+}
+
+// Manual hint: next one not shown yet (sparkle, then sentence, then say it).
+$('btn-hint').addEventListener('click', () => {
+  if (!card || mode === 'meet') return;
+  if (!card.shown.has('sparkle')) showHint('sparkle');
+  else if (!card.shown.has('sentence')) showHint('sentence');
+  else sayWord();
+});
+$('btn-say').addEventListener('click', sayWord);
+function sayWord() {
+  if (!card) return;
+  card.shown.add('say');
+  audio.say(wordId(card.word), card.word);
+}
+
+['notyet', 'got', 'fast'].forEach(r => $(`btn-${r}`).addEventListener('click', () => answer(r)));
+
+function answer(result) {
+  if (!card || busy) return;
+  busy = true;
+  clearTimers();
+  audio.chime.tap();
+  const { word } = card;
+  const hinted = card.shown.size > 0;
+  const ms = performance.now() - card.start;
+  const rec = record(state, word);
+  undoStack.push({
+    word, rec: structuredClone(rec), meter: state.meter, hatched: state.hatched.slice(),
+    stats: structuredClone(sessionStats),
+    session: { queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords], extraEnd: session.extraEnd, results: session.results.slice() },
+  });
+  if (undoStack.length > 5) undoStack.shift();
+
+  let hatchedNow = false;
+  if (mode === 'meet') {
+    applyPlacement(rec, result, Date.now(), sessionStats.levelOnes);
+    if (rec.level === 1 && result === 'notyet') sessionStats.levelOnes++;
+  } else {
+    const res = applyResult(rec, result, { hinted, ms, now: Date.now() });
+    if (res.hatched && !state.hatched.includes(word)) {
+      state.hatched.push(word);
+      sessionStats.hatched.push(word);
+      hatchedNow = true;
+    }
+  }
+  session.answer(result);
+  sessionStats.cards++;
+  persist();
+
+  if (result === 'notyet') {
+    teach(word);
+  } else {
+    sessionStats.correct++;
+    if (result === 'fast' && !hinted) sessionStats.fast++;
+    celebrate(result === 'fast' && !hinted, hatchedNow);
+  }
+}
+
+function celebrate(fast, hatchedNow) {
+  setMascot($('play-mascot'), 'cheer');
+  fast ? audio.chime.fast() : audio.chime.correct();
+  burst(fast ? ['⚡', '⭐', '✨'] : ['⭐', '💖', '✨']);
+  state.meter++;
+  let full = false;
+  if (state.meter >= CONFIG.meterBands) { state.meter = 0; full = true; }
+  persist();
+  renderMeter(full);
+  if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); }
+  if (hatchedNow) audio.chime.hatch();
+  // A voice cheer now and then, not on every card.
+  if (full) audio.say('rainbow-full', 'A whole rainbow!');
+  else if (Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); audio.say(cheerId(t), t); }
+  setTimeout(() => { busy = false; if (full) renderMeter(); showCard(); }, full ? 1500 : 900);
+}
+
+// Not yet: show the word with its sentence, say it, let her repeat, then the parent taps Next.
+async function teach(word) {
+  setMascot($('play-mascot'), 'gentle');
+  audio.chime.gentle();
+  $('card').classList.add('teach');
+  $('word').querySelector('.first').classList.remove('sparkle');
+  renderSentence(word);
+  $('parent-strip').hidden = true;
+  $('teach-next').hidden = false;
+  busy = false;
+  const t = pick(NOT_YET);
+  await audio.say(cheerId(t), t);
+  if (card?.word === word && !$('teach-next').hidden) await audio.say(wordId(word), word);
+}
+$('next').addEventListener('click', () => { audio.stop(); showCard(); });
+
+$('btn-undo').addEventListener('click', () => {
+  const u = undoStack.pop();
+  if (!u) return;
+  audio.stop();
+  state.words[u.word] = u.rec;
+  state.meter = u.meter;
+  state.hatched = u.hatched;
+  sessionStats = u.stats;
+  Object.assign(session, {
+    queue: u.session.queue, index: u.session.index, retries: u.session.retries,
+    correctWords: new Set(u.session.correct), extraEnd: u.session.extraEnd, results: u.session.results,
+  });
+  persist();
+  busy = false;
+  renderMeter();
+  showCard();
+});
+
+$('quit').addEventListener('click', async () => {
+  const keep = sessionStats.cards;
+  if (!(await confirmBox(keep ? 'Stop now? Progress so far is saved.' : 'Stop now?'))) return;
+  clearTimers();
+  audio.stop();
+  device.keepAwake(false);
+  card = null;
+  go(mode === 'meet' ? 'settings' : 'home');
+});
+
+function burst(symbols, n = 10) {
+  const b = $('burst');
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('span');
+    s.textContent = symbols[i % symbols.length];
+    const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 120;
+    s.style.setProperty('--dx', `${Math.cos(a) * d}px`);
+    s.style.setProperty('--dy', `${Math.sin(a) * d}px`);
+    s.style.setProperty('--rot', `${(Math.random() - 0.5) * 120}deg`);
+    b.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+}
+
+// ---------------------------------------------------------------- end
+
+function endSession() {
+  clearTimers();
+  card = null;
+  device.keepAwake(false);
+  if (mode === 'meet') { go('settings'); return; }
+  const sticker = STICKERS[state.stickers.length % STICKERS.length];
+  state.stickers.push({ t: Date.now(), id: sticker });
+  state.sessions.push({ t: Date.now(), cards: sessionStats.cards, correct: sessionStats.correct, fast: sessionStats.fast });
+  if (state.sessions.length > 400) state.sessions.splice(0, state.sessions.length - 400);
+  persist();
+  $('end-title').textContent = pick(['Great reading!', 'You did it!', 'Super reading!']);
+  $('end-sticker').textContent = sticker;
+  $('end-hatched').innerHTML = sessionStats.hatched.length
+    ? `New friend${sessionStats.hatched.length > 1 ? 's' : ''}! ${sessionStats.hatched.map(w => `<span class="new">${creatureFor(w)}</span>`).join(' ')}`
+    : '';
+  go('end');
+  setMascot($('end-mascot'), 'cheer');
+  audio.chime.hatch();
+  audio.say(sessionStats.hatched.length ? 'hatched' : 'sticker', sessionStats.hatched.length ? 'A new friend hatched!' : 'You earned a sticker!');
+}
+$('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
+
+function renderStickers() {
+  $('sticker-grid').innerHTML = state.stickers.map(s => `<span>${s.id}</span>`).join('') || '<p>Finish a game to earn a sticker!</p>';
+}
+
+// ---------------------------------------------------------------- grown-up: head start
+
+function renderSetup() {
+  const host = $('setup-lists');
+  host.innerHTML = '';
+  for (const list of LISTS.filter(l => state.settings.lists.includes(l.id))) {
+    const g = document.createElement('div');
+    g.className = 'list-group';
+    g.innerHTML = `<h3>${list.name}</h3>`;
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    for (const e of list.words) {
+      const c = document.createElement('button');
+      const rec = state.words[e.word];
+      c.className = 'chip' + (rec?.headStart ? ' on' : '');
+      c.innerHTML = `${show(e.word)}<span class="dot lv${rec?.level ?? 0}"></span>`;
+      c.addEventListener('click', () => {
+        const r = record(state, e.word);
+        if (r.headStart) unmarkHeadStart(r); else markHeadStart(r, Date.now());
+        persist();
+        renderSetup();
+      });
+      chips.appendChild(c);
+    }
+    g.appendChild(chips);
+    host.appendChild(g);
+  }
+  $('setup-back').hidden = !state.setupDone;
+}
+$('setup-done').addEventListener('click', () => {
+  const first = !state.setupDone;
+  state.setupDone = true;
+  persist();
+  go(first ? 'home' : 'settings');
+});
+$('setup-back').addEventListener('click', () => go('settings'));
+
+// ---------------------------------------------------------------- grown-up: settings
+
+function renderSettings() {
+  const s = state.settings;
+  $('set-fullscreen').checked = s.fullscreen;
+  $('set-fullscreen').disabled = !device.fullscreenSupported();
+  $('fs-note').textContent = !device.fullscreenSupported() ? 'This browser can\'t go full screen.'
+    : device.isInstalled() ? 'Opened from the home screen icon, so it\'s already full screen.'
+    : s.fullscreen && !device.isFullscreen() ? 'Full screen was left (Back or a swipe). Tap Play or ⛶ to return.' : '';
+  $('set-wake').checked = s.wakeLock;
+  $('wake-note').textContent = device.wakeLockSupported() ? ''
+    : 'Not available at this address (needs https). The screen may dim during a game.';
+  $('set-volume').value = s.voiceVolume;
+  $('set-effects').checked = s.effects;
+  document.querySelectorAll('#set-length button').forEach(b => b.classList.toggle('on', b.dataset.len === s.sessionLength));
+  const lists = $('set-lists');
+  lists.innerHTML = '';
+  for (const l of LISTS) {
+    const c = document.createElement('button');
+    c.className = 'chip' + (s.lists.includes(l.id) ? ' on' : '');
+    c.style.fontSize = '1rem';
+    c.textContent = `${l.name} (${l.words.length})`;
+    c.addEventListener('click', () => {
+      if (s.lists.includes(l.id)) { if (s.lists.length > 1) s.lists = s.lists.filter(x => x !== l.id); }
+      else s.lists = [...s.lists, l.id];
+      persist();
+      renderSettings();
+    });
+    lists.appendChild(c);
+  }
+  const meetLeft = entries().filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).length;
+  $('start-meet').disabled = meetLeft === 0;
+}
+
+$('set-fullscreen').addEventListener('change', async e => {
+  state.settings.fullscreen = e.target.checked;
+  persist();
+  if (e.target.checked) await device.enterFullscreen(); else await device.exitFullscreen();
+  renderSettings();
+});
+$('set-wake').addEventListener('change', e => { state.settings.wakeLock = e.target.checked; persist(); });
+$('set-volume').addEventListener('input', e => { state.settings.voiceVolume = Number(e.target.value); audio.configure(state.settings); persist(); });
+$('set-volume').addEventListener('change', () => audio.say('word-the', 'the'));
+$('set-effects').addEventListener('change', e => { state.settings.effects = e.target.checked; audio.configure(state.settings); persist(); audio.chime.correct(); });
+document.querySelectorAll('#set-length button').forEach(b => b.addEventListener('click', () => { state.settings.sessionLength = b.dataset.len; persist(); renderSettings(); }));
+$('start-meet').addEventListener('click', () => { audio.unlock(); startSession('meet'); });
+
+$('export').addEventListener('click', () => {
+  const blob = new Blob([exportText(state)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sightwords-backup-${dayKey(Date.now())}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$('import').addEventListener('click', () => $('import-file').click());
+$('import-file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const next = importText(await file.text());
+    if (!(await confirmBox('Replace the progress on this phone with this backup?'))) return;
+    state = next;
+    persist();
+    audio.configure(state.settings);
+    renderSettings();
+  } catch (err) {
+    await confirmBox(err.message);
+  }
+});
+$('reset-all').addEventListener('click', async () => {
+  if (!(await confirmBox('Erase all progress, friends and stickers? This can\'t be undone (unless you saved a backup).'))) return;
+  const settings = state.settings;
+  state = { ...defaultState(), settings };
+  persist();
+  go('setup');
+});
+
+// ---------------------------------------------------------------- grown-up: progress
+
+function renderProgress() {
+  const ents = entries();
+  const weekAgo = Date.now() - 7 * 864e5;
+  const week = state.sessions.filter(s => s.t >= weekAgo);
+  const known = ents.filter(e => levelOf(e.word) >= 4).length;
+  $('progress-week').textContent = `This week: ${week.length} game${week.length === 1 ? '' : 's'}, ${week.reduce((n, s) => n + s.cards, 0)} cards. `
+    + `Known: ${known} of ${ents.length} words.`;
+  $('progress-ready').hidden = !(known / ents.length >= 0.8 && LISTS.some(l => !state.settings.lists.includes(l.id)));
+  const grid = $('progress-grid');
+  grid.innerHTML = '';
+  const order = ents.slice().sort((a, b) => levelOf(a.word) - levelOf(b.word) || (state.words[b.word]?.misses ?? 0) - (state.words[a.word]?.misses ?? 0));
+  for (const e of order) {
+    const r = state.words[e.word] || newRecord();
+    const times = r.history.filter(h => h.r !== 'notyet').map(h => h.ms);
+    const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length / 1000).toFixed(1) + ' s' : '—';
+    const last = r.lastSeen ? new Date(r.lastSeen).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'never';
+    const b = document.createElement('button');
+    b.className = 'prog';
+    b.innerHTML = `<b>${show(e.word)}${r.headStart ? ' ⭐' : ''}</b><span class="lvl lv${r.level}">${LEVEL_NAMES[r.level]}</span><br>`
+      + `missed ${r.misses} · avg ${avg}<br>last seen ${last}`;
+    b.addEventListener('click', async () => {
+      if (!(await confirmBox(`Reset "${show(e.word)}" to New?`))) return;
+      delete state.words[e.word];
+      persist();
+      renderProgress();
+    });
+    grid.appendChild(b);
+  }
+}
+
+// ---------------------------------------------------------------- boot
+
+audio.configure(state.settings);
+for (const s of SCREENS) $(s).hidden = true;
+document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
+if (art('meadow-bg')) document.body.classList.add('has-meadow');
+if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+window.__sightwords = { get state() { return state; } }; // for the smoke test

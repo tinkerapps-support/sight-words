@@ -1,0 +1,13 @@
+{
+  "name": "Rainbow Words",
+  "short_name": "Rainbow Words",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#ffe3f0",
+  "theme_color": "#ffd6ea",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

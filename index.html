@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#ffd6ea">
+  <title>Rainbow Words</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Home: the Rainbow Meadow -->
+  <section id="home" class="screen" hidden>
+    <header class="topbar">
+      <button id="fs-again" class="icon-btn" hidden aria-label="Full screen">⛶</button>
+      <span class="spacer"></span>
+      <button id="gear" class="icon-btn gear" aria-label="Settings (hold for 3 seconds)">
+        <svg class="hold-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg>⚙
+      </button>
+    </header>
+    <div class="mascot-wrap"><div id="home-mascot" class="mascot idle">🦄</div></div>
+    <div class="meadow-head">
+      <button id="page-prev" class="icon-btn small" aria-label="Previous list">‹</button>
+      <h2 id="meadow-title">Rainbow Meadow</h2>
+      <button id="page-next" class="icon-btn small" aria-label="Next list">›</button>
+    </div>
+    <div id="meadow" class="meadow"></div>
+    <p id="meadow-count" class="meadow-count"></p>
+    <button id="play" class="big-btn play">Play ▶</button>
+    <button id="stickers-btn" class="link-btn">⭐ <span id="sticker-count">0</span> stickers</button>
+  </section>
+
+  <!-- Play: one word at a time -->
+  <section id="play-screen" class="screen" hidden>
+    <header class="topbar">
+      <button id="quit" class="icon-btn small" aria-label="Stop">✕</button>
+      <div id="meter" class="meter" aria-hidden="true"></div>
+      <div id="play-mascot" class="mascot small idle">🦄</div>
+    </header>
+    <div class="card-wrap">
+      <div id="card" class="card">
+        <div id="word" class="word"></div>
+        <div id="hint" class="hint" hidden>
+          <div id="hint-art" class="hint-art"></div>
+          <button id="hint-sentence" class="hint-sentence"></button>
+        </div>
+      </div>
+      <div id="burst" class="burst" aria-hidden="true"></div>
+    </div>
+    <div id="teach-next" class="teach-next" hidden>
+      <button id="next" class="big-btn">Next ➜</button>
+    </div>
+    <footer id="parent-strip" class="parent-strip">
+      <div class="tools">
+        <button id="btn-hint" class="tool">💡 Hint</button>
+        <button id="btn-say" class="tool">🔊 Say it</button>
+        <button id="btn-undo" class="tool" disabled>↶ Undo</button>
+      </div>
+      <div class="answers">
+        <button id="btn-notyet" class="answer notyet">↺<span>Not yet</span></button>
+        <button id="btn-got" class="answer got">✓<span>Got it</span></button>
+        <button id="btn-fast" class="answer fast">⚡<span>Fast</span></button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- End of a session -->
+  <section id="end-screen" class="screen" hidden>
+    <div class="end-box">
+      <div id="end-mascot" class="mascot cheer">🦄</div>
+      <h1 id="end-title">Great reading!</h1>
+      <div id="end-sticker" class="end-sticker"></div>
+      <div id="end-hatched" class="end-hatched"></div>
+      <button id="end-done" class="big-btn">Done</button>
+    </div>
+  </section>
+
+  <!-- Sticker page -->
+  <section id="sticker-screen" class="screen" hidden>
+    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back">‹</button><h2>My stickers</h2><span class="spacer"></span></header>
+    <div id="sticker-grid" class="sticker-grid"></div>
+  </section>
+
+  <!-- Grown-up screens -->
+  <section id="setup-screen" class="screen grown" hidden>
+    <header class="topbar"><button id="setup-back" class="icon-btn small back" aria-label="Back">‹</button><h2>Head start</h2><span class="spacer"></span></header>
+    <p class="lead">For the grown-up: tap the words your child can <b>already read</b>. The first games
+      start with these, so they're easy wins. You can change this any time in Settings.</p>
+    <div id="setup-lists"></div>
+    <div class="row-btns">
+      <button id="setup-done" class="big-btn">Done</button>
+    </div>
+  </section>
+
+  <section id="settings-screen" class="screen grown" hidden>
+    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back">‹</button><h2>Settings</h2><span class="spacer"></span></header>
+    <div class="settings">
+      <label class="setting"><span>Full screen</span><input type="checkbox" id="set-fullscreen" role="switch"></label>
+      <p class="note" id="fs-note"></p>
+      <label class="setting"><span>Keep screen on while playing</span><input type="checkbox" id="set-wake" role="switch"></label>
+      <p class="note" id="wake-note"></p>
+      <button class="setting nav" data-go="setup">Head start: words already known <span>›</span></button>
+      <div class="setting col">
+        <span>Word lists</span>
+        <div id="set-lists" class="chips"></div>
+      </div>
+      <label class="setting col"><span>Voice volume</span><input type="range" id="set-volume" min="0" max="1" step="0.05"></label>
+      <label class="setting"><span>Sound effects</span><input type="checkbox" id="set-effects" role="switch"></label>
+      <div class="setting col">
+        <span>Game length</span>
+        <div class="seg" id="set-length">
+          <button data-len="short">Short</button><button data-len="normal">Normal</button><button data-len="long">Long</button>
+        </div>
+      </div>
+      <button class="setting nav" data-go="progress">Progress <span>›</span></button>
+      <button class="setting nav" id="start-meet">Meet the words (quick check) <span>›</span></button>
+      <div class="setting col">
+        <span>Backup</span>
+        <div class="row-btns">
+          <button id="export" class="small-btn">Save backup</button>
+          <button id="import" class="small-btn">Load backup</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+      </div>
+      <button class="setting nav danger" id="reset-all">Reset all progress <span>›</span></button>
+      <p class="note about">Voices are AI-generated (OpenAI text-to-speech). When a voice clip is missing, the
+        phone's own voice is used. Everything is saved only on this phone; nothing is sent anywhere.</p>
+    </div>
+  </section>
+
+  <section id="progress-screen" class="screen grown" hidden>
+    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back">‹</button><h2>Progress</h2><span class="spacer"></span></header>
+    <p id="progress-week" class="lead"></p>
+    <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
+    <div id="progress-grid" class="progress-grid"></div>
+    <p class="note">Tap a word to reset it.</p>
+  </section>
+
+  <!-- In-app confirm (never a browser pop-up) -->
+  <div id="confirm" class="confirm" hidden>
+    <div class="confirm-box">
+      <p id="confirm-text"></p>
+      <div class="row-btns">
+        <button id="confirm-no" class="small-btn">Cancel</button>
+        <button id="confirm-yes" class="small-btn danger">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-gate" class="start-gate">
+    <div class="mascot cheer big">🦄</div>
+    <h1>Rainbow Words</h1>
+    <button id="start" class="big-btn play">Tap to start</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
