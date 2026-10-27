@@ -17,7 +17,8 @@ export const CONFIG = {
   clozePauseMs: 1700,        // the pause where the word goes when a hint sentence is read
   historyCap: 60,
   popsToLearn: 2,            // first-try Bubble Pops in a row: Learning → Getting it
-  buildShareMastered: 0.3,   // share of a crowned word's cards that are Build It
+  buildShareUnbuilt: 0.8,    // hatched word not yet built right: share of its cards that are Build It
+  buildShareBuilt: 0.4,      // after it's built right once
   // Automatic hints by level: when each one appears (ms after the card shows).
   hints: {
     1: { sentence: 0, sparkle: 3000 },

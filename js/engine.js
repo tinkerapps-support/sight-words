@@ -152,14 +152,13 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
 
 // Which kind of card a word gets, by stage (owner, 2026-10-27): Bubble Pop while it's Learning
 // (hearing it and finding it is the first step), reading while it's Getting it / Almost, and Build It
-// (spelling, the step beyond reading) once it has hatched: every time until it's built right on the
-// first try, then now and then.
+// (spelling, the step beyond reading) once it has hatched: 80% of its cards until it's built right
+// on the first try, 40% after (CONFIG.buildShare*; owner, 2026-10-27). The rest are reading cards.
 export function cardKind(rec, rng = Math.random) {
   if (needsIntro(rec)) return 'intro';
   if (rec.level <= 1) return 'pop';
   if (rec.level <= 3) return 'read';
-  if (rec.level === 4) return rec.built ? 'read' : 'build';
-  return rng() < CONFIG.buildShareMastered ? 'build' : 'read';
+  return rng() < (rec.built ? CONFIG.buildShareBuilt : CONFIG.buildShareUnbuilt) ? 'build' : 'read';
 }
 
 function log(rec, entry) {
