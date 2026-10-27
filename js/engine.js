@@ -254,7 +254,9 @@ export function endingCard(words, rec, last, clash = (a, b) => a === b) {
 // ---- A running session ----
 
 export class Session {
-  constructor({ queue, clash, rng = Math.random }) {
+  // retries: false for "Meet the words", where each word is checked exactly once.
+  constructor({ queue, clash, rng = Math.random, retries = true }) {
+    this.allowRetries = retries;
     this.queue = queue.slice();
     this.clash = clash || ((a, b) => a === b);
     this.rng = rng;
@@ -274,6 +276,7 @@ export class Session {
     this.results.push({ word, result });
     const isLast = this.index === this.queue.length - 1;
     if (result === 'notyet') {
+      if (!this.allowRetries) { this.index++; return; }
       const n = this.retries[word] || 0;
       if (n < CONFIG.maxRetriesPerWord) {
         this.retries[word] = n + 1;

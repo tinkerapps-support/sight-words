@@ -110,7 +110,8 @@ function speak(text, done) {
   speechSynthesis.resume();
   const wait = performance.now() - lastCancel < 150 ? 120 : 0;
   setTimeout(() => { if (current?.utterance === u) speechSynthesis.speak(u); }, wait);
-  setTimeout(done, 6000); // some Android voices never fire onend
+  // Some Android voices never fire onend: give up after about how long the line takes to say.
+  setTimeout(done, 900 + text.length * 110);
 }
 
 // ---- Chimes (synthesized, no files) ----

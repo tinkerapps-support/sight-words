@@ -1,7 +1,7 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
 import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey } from './engine.js';
-import { LISTS, listById, activeWords, wordEntry } from './lists.js';
+import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
@@ -26,6 +26,7 @@ let card = null;           // { word, level, shown: Set, start, timers: [] }
 let undoStack = [];
 let sessionStats = null;
 let busy = false;
+let celebrationToken = 0;  // bumped by Undo/Quit so a pending celebration doesn't advance
 
 const persist = () => save(state);
 const img = src => `<img src="${src}" alt="" draggable="false">`;
@@ -205,7 +206,7 @@ function startSession(kind) {
     queue = built.queue;
     clash = built.clash;
   }
-  session = new Session({ queue, clash });
+  session = new Session({ queue, clash, retries: kind !== 'meet' });
   sessionStats = { cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
@@ -240,6 +241,7 @@ function clearTimers() {
 }
 
 function showCard() {
+  if (!session) return;
   clearTimers();
   $('teach-next').hidden = true;
   $('parent-strip').hidden = false;
@@ -452,11 +454,19 @@ function celebrate(fast, hatchedNow, change) {
   // A voice cheer now and then, not on every card (never over a hatching).
   if (full && !hatchedNow) audio.say('rainbow-full', 'A whole rainbow!');
   else if (!hatchedNow && Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); audio.say(cheerId(t), t); }
-  const next = () => { hideEggPop(); busy = false; if (full) renderMeter(); showCard(); };
+  // Stale if the parent stopped or undid meanwhile (Undo/Quit replace the session state).
+  const s = session, token = ++celebrationToken;
+  const next = () => {
+    if (session !== s || token !== celebrationToken) return;
+    hideEggPop(); busy = false; if (full) renderMeter(); showCard();
+  };
   if (hatchedNow) {
     // Show the cracked egg for a beat, then the hatching takes over the screen.
     eggPop({ ...change, before: 3, after: 3, hatching: true });
-    setTimeout(() => { hideEggPop(); hatchShow(change.word).then(next); }, 900);
+    setTimeout(() => {
+      if (session !== s || token !== celebrationToken) return;
+      hideEggPop(); hatchShow(change.word).then(next);
+    }, 900);
     return;
   }
   const wait = change ? eggPop(change) : 900;
@@ -488,6 +498,8 @@ $('next').addEventListener('click', () => { audio.stop(); showCard(); });
 $('btn-undo').addEventListener('click', () => {
   const u = undoStack.pop();
   if (!u) return;
+  celebrationToken++;
+  hideEggPop();
   audio.stop();
   state.words[u.word] = u.rec;
   state.meter = u.meter;
@@ -507,9 +519,13 @@ $('quit').addEventListener('click', async () => {
   const keep = sessionStats.cards;
   if (!(await confirmBox(keep ? 'Stop now? Progress so far is saved.' : 'Stop now?'))) return;
   clearTimers();
+  celebrationToken++;
+  hideEggPop();
   audio.stop();
   device.keepAwake(false);
   card = null;
+  session = null;
+  busy = false;
   go(mode === 'meet' ? 'settings' : 'home');
 });
 
@@ -551,8 +567,9 @@ function endSession() {
     : '';
   go('end');
   setMascot($('end-mascot'), 'cheer');
-  sessionStats.hatched.length ? audio.chime.hatch() : audio.chime.sticker();
-  audio.say(sessionStats.hatched.length ? 'hatched' : 'sticker', sessionStats.hatched.length ? 'A new friend hatched!' : 'You earned a sticker!');
+  // Hatches were already celebrated as they happened; the end screen is about the sticker.
+  audio.chime.sticker();
+  audio.say('sticker', 'You earned a sticker!');
 }
 $('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
 
@@ -670,6 +687,7 @@ $('import-file').addEventListener('change', async e => {
     state = next;
     persist();
     audio.configure(state.settings);
+    music.setEnabled(state.settings.music);
     renderSettings();
   } catch (err) {
     await confirmBox(err.message);
@@ -708,6 +726,7 @@ function renderProgress() {
     b.addEventListener('click', async () => {
       if (!(await mathCheck(`Reset "${show(e.word)}" to New?`))) return;
       delete state.words[e.word];
+      state.hatched = state.hatched.filter(w => w !== e.word);
       persist();
       renderProgress();
     });
