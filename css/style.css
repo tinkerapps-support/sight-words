@@ -471,3 +471,14 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .tile:active { transform: translateY(3px); box-shadow: 0 2px 0 #e7b7cf; }
 .tile.used { visibility: hidden; }
 .tile.nope { animation: nudge 0.45s; }
+.prog .next { display: block; margin-top: 4px; color: var(--pink-deep); font-weight: 600; }
+.how { background: #fff; border-radius: 14px; padding: 10px 14px; margin: 0 0 12px; font-size: 0.95rem; line-height: 1.45; }
+.how summary { font-weight: 700; color: var(--pink-deep); cursor: pointer; }
+.how ol { margin: 6px 0; padding-left: 22px; }
+.how p { margin: 6px 0; }
+.icon-btn.help { font-weight: 700; color: var(--pink-deep); font-family: 'Andika', sans-serif; }
+.guide { padding-bottom: 24px; line-height: 1.5; font-size: 1rem; }
+.guide h3 { margin: 18px 0 4px; color: var(--pink-deep); font-size: 1.1rem; }
+.guide p { margin: 6px 0; }
+.guide ul { margin: 6px 0; padding-left: 22px; }
+.guide li { margin: 4px 0; }

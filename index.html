@@ -16,6 +16,7 @@
     <header class="topbar">
       <button id="fs-again" class="icon-btn" hidden aria-label="Full screen"><span class="glyph" data-icon="ui-fullscreen">⛶</span></button>
       <span class="spacer"></span>
+      <button id="help" class="icon-btn help" data-go="guide" aria-label="Guide for grown-ups"><span class="glyph" data-icon="ui-help">?</span></button>
       <button id="gear" class="icon-btn gear" aria-label="Settings (hold for 3 seconds)">
         <svg class="hold-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg><span class="glyph" data-icon="ui-settings">⚙</span>
       </button>
@@ -163,9 +164,84 @@
     </div>
   </section>
 
+  <section id="guide-screen" class="screen grown" hidden>
+    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>For grown-ups</h2><span class="spacer"></span></header>
+    <div class="guide">
+      <p class="lead">Rainbow Words is made to be played together. Your child reads, you listen and tap
+        how it went, and the app takes care of which words come up and how much help to give.</p>
+
+      <h3>Playing a game</h3>
+      <p>Sit together and tap <b>Play</b>. A word shows up, your child reads it out loud, and you tap
+        one of the three buttons at the bottom:</p>
+      <ul>
+        <li><b>⚡ Fast</b>: read right away, in about two seconds, with no help.</li>
+        <li><b>✓ Got it</b>: right, but it took some working out or a hint.</li>
+        <li><b>↺ Not yet</b>: wrong, or no answer. That's completely fine.</li>
+      </ul>
+      <p>Be honest with Fast. It's the button that tells the app a word is really learned, so
+        when you're not sure, tap Got it. A game takes about five minutes. Tapped the wrong button?
+        <b>Undo</b> fixes it.</p>
+
+      <h3>Hints</h3>
+      <p>If your child pauses, help appears on its own: the word's first letter sparkles,
+        then a picture sentence is read aloud with a gap where the word goes, so they can fill it in.
+        Help comes sooner for new words and fades as a word gets easier.</p>
+      <p>You can give help any time with <b>Hint</b> or <b>Say it</b>. After a Say it, tap Got it or
+        Not yet, never Fast. The app counts a Fast with a hint showing as Got it anyway.</p>
+
+      <h3>When a word is missed</h3>
+      <p>There are no red crosses or sad sounds. After Not yet, the app says the word, spells it
+        letter by letter, and reads it in its sentence. Let your child say it back, then tap
+        <b>Next</b>. The word comes back a few cards later, and the next card is usually an easy one
+        for a quick win. A word missed three times rests until tomorrow.</p>
+
+      <h3>Eggs and friends</h3>
+      <p>Every word has an egg in the meadow. It hatches into a little friend once the word is read
+        <b>Fast on two different days</b>, so it never hatches on the first day. After each correct
+        card, the egg pops up with buttons that fill as the word gets closer. A moon on the last
+        button means "come back tomorrow". Settings → Progress shows exactly what each word needs
+        next.</p>
+
+      <h3>Bubble Pop and Build It</h3>
+      <p>Two extra games that check themselves, so your child can play them alone. Bubble Pop: hear
+        a word, pop its bubble. Build It: tap the letters in order. They use only words your child
+        has already met. They're good practice, but the reading game with you is what hatches eggs.</p>
+
+      <h3>A few tips</h3>
+      <ul>
+        <li>One short game a day works better than a long one now and then. Coming back on another
+          day is what makes words stick.</li>
+        <li>Stop while it's still fun. The ✕ button ends a game early and keeps everything learned so far.</li>
+        <li>Praise the trying, not only the right answers.</li>
+        <li>Every reading game earns a sticker, whatever happens.</li>
+      </ul>
+
+      <h3>Settings</h3>
+      <p>Press and hold the ⚙ gear for three seconds (so little fingers don't open it by accident).
+        There you can mark words your child already knows (<b>Head start</b>), change the game
+        length, turn music and sounds on or off, see <b>Progress</b>, and save a <b>backup</b>.
+        Everything is saved only on this phone, so a backup now and then is a good idea.</p>
+    </div>
+  </section>
+
   <section id="progress-screen" class="screen grown" hidden>
     <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Progress</h2><span class="spacer"></span></header>
     <p id="progress-week" class="lead"></p>
+    <details class="how">
+      <summary>How eggs hatch</summary>
+      <p>An egg hatches when the word is read <b>Fast on two different days</b>. A Fast only counts
+        when no hint was showing (Fast with a hint counts as Got it).</p>
+      <ol>
+        <li>Meets the word (new-word card)</li>
+        <li>2 correct reads in a row → <i>Getting it</i> (spotted egg)</li>
+        <li>2 Fast reads in a row → <i>Almost</i> (cracked egg)</li>
+        <li>A Fast read on a <b>later day</b> → <i>Known</i>: it hatches</li>
+        <li>A Fast read 3+ days after that → <i>Mastered</i>: a crown</li>
+      </ol>
+      <p>Head-start words begin at Almost, so one Fast read on a later day hatches them. Not yet moves a
+        word back at most two levels. A creature never goes back into its egg. Bubble Pop can only help
+        with step 2.</p>
+    </details>
     <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
     <div id="progress-grid" class="progress-grid"></div>
     <p class="note">Tap a word to reset it.</p>

@@ -1,6 +1,6 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
@@ -59,9 +59,9 @@ const levelOf = word => state.words[word]?.level ?? 0;
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'game-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+const SCREENS = ['home', 'play-screen', 'game-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', stickers: 'sticker-screen', play: 'play-screen', game: 'game-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', game: 'game-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id === 'home') renderHome();
   if (id === 'setup-screen') renderSetup();
@@ -920,7 +920,8 @@ function renderProgress() {
     const b = document.createElement('button');
     b.className = 'prog';
     b.innerHTML = `<b>${show(e.word)}${r.headStart ? ' ⭐' : ''}</b><span class="lvl lv${r.level}">${LEVEL_NAMES[r.level]}</span><br>`
-      + `missed ${r.misses} · avg ${avg}<br>last seen ${last}`;
+      + `missed ${r.misses} · avg ${avg}<br>last seen ${last}`
+      + `<span class="next">${nextStep(state.words[e.word], Date.now())}</span>`;
     b.addEventListener('click', async () => {
       if (!(await mathCheck(`Reset "${show(e.word)}" to New?`))) return;
       delete state.words[e.word];

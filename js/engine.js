@@ -66,6 +66,24 @@ export function hatchProgress(rec, now) {
   return { step: 5, waitingForTomorrow: dayKey(now) === rec.levelDay };
 }
 
+// For the parent's Progress screen: what this word needs next, in plain words.
+export function nextStep(rec, now) {
+  if (rec && (rec.restUntil || 0) > now) return 'Resting until tomorrow (missed 3 times today)';
+  if (!rec || rec.level === 0) return rec?.seen ? 'Not started yet' : 'Meets it in a coming game';
+  if (rec.level === 1) return rec.correctStreak >= 1 ? 'Next: one more correct read' : 'Next: 2 correct reads in a row';
+  if (rec.level === 2) return rec.fastStreak >= 1 ? 'Next: one more Fast read' : 'Next: 2 Fast reads in a row';
+  if (rec.level === 3) {
+    return dayKey(now) === rec.levelDay ? 'Next: a Fast read tomorrow hatches it 🌙' : 'Next: a Fast read hatches it!';
+  }
+  if (rec.level === 4) {
+    const crownAt = rec.levelSince + CONFIG.promoteKnownAfterDays * DAY;
+    if (now >= crownAt) return 'Hatched! A Fast read now earns the crown';
+    const day = new Date(crownAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return `Hatched! A Fast read from ${day} earns the crown`;
+  }
+  return 'Mastered 👑';
+}
+
 // Missed CONFIG.restAfterMisses times in one game: rest it until tomorrow so a hard word
 // doesn't keep coming back to the same frustration; it returns fresh next session.
 export function restWord(rec, now) {
