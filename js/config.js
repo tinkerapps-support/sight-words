@@ -18,7 +18,8 @@ export const CONFIG = {
   historyCap: 60,
   popsToLearn: 2,            // first-try Bubble Pops in a row: Learning → Getting it
   buildShareUnbuilt: 0.8,    // hatched word not yet built right: share of its cards that are Build It
-  buildShareBuilt: 0.4,      // after it's built right once
+  buildShareBuilt: 0.4,      // after it's built right once: Build It…
+  popShareBuilt: 0.2,        // …Bubble Pop for variety, and the rest (40%) reading
   // Automatic hints by level: when each one appears (ms after the card shows).
   hints: {
     1: { sentence: 0, sparkle: 3000 },
