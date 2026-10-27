@@ -86,6 +86,9 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
 export function markHeadStart(rec, now) {
   rec.headStart = true;
   if (rec.level < 3) {
+    // Remember what the boost replaced, so an unmark before she plays the word undoes it.
+    const { level, levelDay, levelSince, correctStreak, fastStreak, nextDue, seen } = rec;
+    rec.beforeHeadStart = { level, levelDay, levelSince, correctStreak, fastStreak, nextDue, seen };
     setLevel(rec, 3, now);
     rec.correctStreak = 0;
     rec.fastStreak = 0;
@@ -93,8 +96,15 @@ export function markHeadStart(rec, now) {
   }
 }
 
+// Unmarking undoes the boost if the word hasn't been played since; progress she earned stays.
 export function unmarkHeadStart(rec) {
   rec.headStart = false;
+  const before = rec.beforeHeadStart;
+  if (before && rec.seen === before.seen) {
+    const { seen, ...restore } = before;
+    Object.assign(rec, restore);
+  }
+  delete rec.beforeHeadStart;
 }
 
 // Optional "Meet the words" check. levelOneCount = words already at level 1 so far.

@@ -244,3 +244,11 @@ body.has-meadow #home { background: url('../assets/art/meadow-bg.webp') center b
 body.has-meadow .meadow { background: rgba(255,255,255,0.18); box-shadow: none; }
 body.has-meadow .friend { background: transparent; }
 body.has-meadow .friend.hatched { background: transparent; box-shadow: none; }
+
+/* ---- Grown-up math check (reset) ---- */
+.math { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.math label { font-weight: 600; }
+.math input { font-size: 1.4rem; padding: 10px 12px; border-radius: 12px; border: 2px solid #e4dbe8; width: 100%; }
+.math input:focus { outline: none; border-color: var(--pink-deep); }
+.math-wrong { margin: 0; color: #c0392b; font-size: 0.9rem; }
+.setting .note { margin: 0; }

@@ -61,9 +61,37 @@ document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', 
 function confirmBox(text) {
   return new Promise(resolve => {
     $('confirm-text').textContent = text;
+    $('math').hidden = true;
     $('confirm').hidden = false;
     const finish = v => { $('confirm').hidden = true; $('confirm-yes').onclick = $('confirm-no').onclick = null; resolve(v); };
     $('confirm-yes').onclick = () => finish(true);
+    $('confirm-no').onclick = () => finish(false);
+  });
+}
+
+// Grown-ups only: a two-digit sum a five-year-old can't do, asked fresh each time.
+function mathCheck(text) {
+  const a = 12 + Math.floor(Math.random() * 30), b = 13 + Math.floor(Math.random() * 30);
+  return new Promise(resolve => {
+    $('confirm-text').textContent = text;
+    $('math-q').textContent = `To confirm, what is ${a} + ${b}?`;
+    $('math-answer').value = '';
+    $('math-wrong').hidden = true;
+    $('math').hidden = false;
+    $('confirm').hidden = false;
+    $('math-answer').focus();
+    const finish = v => {
+      $('confirm').hidden = true;
+      $('math').hidden = true;
+      $('confirm-yes').onclick = $('confirm-no').onclick = $('math-answer').onkeydown = null;
+      resolve(v);
+    };
+    const check = () => {
+      if (Number($('math-answer').value.trim()) === a + b) finish(true);
+      else { $('math-wrong').hidden = false; $('math-answer').select(); }
+    };
+    $('confirm-yes').onclick = check;
+    $('math-answer').onkeydown = e => { if (e.key === 'Enter') check(); };
     $('confirm-no').onclick = () => finish(false);
   });
 }
@@ -509,7 +537,7 @@ $('import-file').addEventListener('change', async e => {
   }
 });
 $('reset-all').addEventListener('click', async () => {
-  if (!(await confirmBox('Erase all progress, friends and stickers? This can\'t be undone (unless you saved a backup).'))) return;
+  if (!(await mathCheck('Erase all progress, friends and stickers? This can\'t be undone (unless you saved a backup).'))) return;
   const settings = state.settings;
   state = { ...defaultState(), settings };
   persist();
@@ -539,7 +567,7 @@ function renderProgress() {
     b.innerHTML = `<b>${show(e.word)}${r.headStart ? ' ⭐' : ''}</b><span class="lvl lv${r.level}">${LEVEL_NAMES[r.level]}</span><br>`
       + `missed ${r.misses} · avg ${avg}<br>last seen ${last}`;
     b.addEventListener('click', async () => {
-      if (!(await confirmBox(`Reset "${show(e.word)}" to New?`))) return;
+      if (!(await mathCheck(`Reset "${show(e.word)}" to New?`))) return;
       delete state.words[e.word];
       persist();
       renderProgress();

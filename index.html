@@ -124,7 +124,11 @@
           <input type="file" id="import-file" accept="application/json,.json" hidden>
         </div>
       </div>
-      <button class="setting nav danger" id="reset-all">Reset all progress <span>›</span></button>
+      <div class="setting col">
+        <span>Reset progress</span>
+        <span class="note">Erases every word's progress, friends and stickers. Settings are kept.</span>
+        <button id="reset-all" class="small-btn danger">Reset progress</button>
+      </div>
       <p class="note about">Voices are AI-generated (OpenAI text-to-speech). When a voice clip is missing, the
         phone's own voice is used. Everything is saved only on this phone; nothing is sent anywhere.</p>
     </div>
@@ -142,6 +146,11 @@
   <div id="confirm" class="confirm" hidden>
     <div class="confirm-box">
       <p id="confirm-text"></p>
+      <div id="math" class="math" hidden>
+        <label for="math-answer" id="math-q"></label>
+        <input id="math-answer" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done">
+        <p id="math-wrong" class="math-wrong" hidden>Not quite. Try again.</p>
+      </div>
       <div class="row-btns">
         <button id="confirm-no" class="small-btn">Cancel</button>
         <button id="confirm-yes" class="small-btn danger">Yes</button>
