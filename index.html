@@ -161,6 +161,25 @@
       <p class="lead">Rainbow Words is made to be played together. Your child reads, you listen and tap
         how it went, and the app takes care of which words come up and how much help to give.</p>
 
+      <h3 id="guide-eggs">When do eggs hatch?</h3>
+      <p>Every word has an egg in the meadow. It hatches into a little friend once the word is read
+        <b>Fast on two different days</b>, so an egg never hatches on the day a word is first met.
+        Each egg has 6 buttons that fill on the way:</p>
+      <ol>
+        <li>Meets the word (the new-word card)</li>
+        <li>Pops its bubble on the first try</li>
+        <li>Pops it on the first try again → <i>Getting it</i> (spotted egg)</li>
+        <li>A Fast read</li>
+        <li>A second Fast read in a row → <i>Almost</i> (cracked egg)</li>
+        <li>A Fast read on a <b>later day</b> → it <b>hatches!</b></li>
+      </ol>
+      <p>A <b>moon</b> on the last button means it's waiting for tomorrow. Words you marked in Head
+        start begin at step 5, so one Fast read on another day hatches them. A Not yet moves a word
+        back a step or two. A friend never goes back into its egg.</p>
+      <p>After hatching, spelling the word in Build It (right on the first try) plus a Fast read 3 or
+        more days later earns its <b>crown</b>.</p>
+      <p><b>Tap any egg</b> in the meadow to see how close it is and what it needs next.</p>
+
       <h3>Playing a game</h3>
       <p>Sit together and tap <b>Play</b>. A word shows up, your child reads it out loud, and you tap
         one of the three buttons at the bottom:</p>
@@ -185,13 +204,6 @@
         letter by letter, and reads it in its sentence. Let your child say it back, then tap
         <b>Next</b>. The word comes back a few cards later, and the next card is usually an easy one
         for a quick win. A word missed three times rests until tomorrow.</p>
-
-      <h3>Eggs and friends</h3>
-      <p>Every word has an egg in the meadow. It hatches into a little friend once the word is read
-        <b>Fast on two different days</b> (after its Bubble Pops), so it never hatches on the first day. After each correct
-        card, the egg pops up with buttons that fill as the word gets closer. A moon on the last
-        button means "come back tomorrow". Settings → Progress shows exactly what each word needs
-        next.</p>
 
       <h3>Three kinds of cards</h3>
       <p>The game changes with each word as your child learns it:</p>
@@ -263,6 +275,20 @@
     <p class="hatch-title">A new friend!</p>
     <p id="hatch-word" class="hatch-word"></p>
     <button id="hatch-done" class="big-btn" hidden>Yay! ➜</button>
+  </div>
+
+  <!-- Tapping an egg: how close it is to hatching -->
+  <div id="egg-info" class="confirm" hidden>
+    <div class="confirm-box egg-info">
+      <div id="egg-info-pic" class="egg-pop-pic"></div>
+      <p id="egg-info-word" class="egg-info-word"></p>
+      <div id="egg-info-dots" class="egg-dots"></div>
+      <p id="egg-info-next" class="egg-info-next"></p>
+      <div class="row-btns">
+        <button id="egg-info-how" class="small-btn">How eggs hatch</button>
+        <button id="egg-info-close" class="small-btn">OK</button>
+      </div>
+    </div>
   </div>
 
   <!-- In-app confirm (never a browser pop-up) -->

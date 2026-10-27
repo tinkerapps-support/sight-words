@@ -148,6 +148,7 @@ function renderHome() {
       b.innerHTML = eggFor(stage);
       if (stage) b.classList.add('wobble' + stage);
       b.setAttribute('aria-label', 'egg');
+      b.addEventListener('click', () => showEggInfo(e.word));
     }
     m.appendChild(b);
   }
@@ -478,13 +479,7 @@ function eggPop({ word, before, after, stepBefore = 0, hatching = false }) {
   // One felt button per step toward hatching (engine hatchProgress); a step gained pops in.
   const prog = hatching ? { step: HATCH_STEPS - 1, waitingForTomorrow: false } : hatchProgress(state.words[word], Date.now());
   const gained = !hatching && prog.step > stepBefore;
-  const dotOn = art('dot-on'), dotOff = art('dot-off');
-  dots.classList.toggle('felt', Boolean(dotOn && dotOff));
-  dots.innerHTML = Array.from({ length: HATCH_STEPS }, (_, i) => {
-    const cls = [i < prog.step ? 'on' : '', gained && i === prog.step - 1 ? 'new' : '',
-      prog.waitingForTomorrow && i === HATCH_STEPS - 1 ? 'tomorrow' : ''].filter(Boolean).join(' ');
-    return `<i class="${cls}"></i>`;
-  }).join('');
+  renderDots(dots, prog, gained);
   dots.hidden = hatched;
   // For the grown-up: why the last button won't fill today.
   $('egg-note').hidden = !prog.waitingForTomorrow || hatched;
@@ -499,6 +494,37 @@ function eggPop({ word, before, after, stepBefore = 0, hatching = false }) {
   }
   return up ? 1500 : 1150;
 }
+
+// One felt button per step toward hatching (engine hatchProgress); the newest one can pop in.
+function renderDots(host, prog, gained = false) {
+  host.classList.toggle('felt', Boolean(art('dot-on') && art('dot-off')));
+  host.innerHTML = Array.from({ length: HATCH_STEPS }, (_, i) => {
+    const cls = [i < prog.step ? 'on' : '', gained && i === prog.step - 1 ? 'new' : '',
+      prog.waitingForTomorrow && i === HATCH_STEPS - 1 ? 'tomorrow' : ''].filter(Boolean).join(' ');
+    return `<i class="${cls}"></i>`;
+  }).join('');
+}
+
+// Tapping an egg in the meadow: its word, how close it is, and what it needs next.
+function showEggInfo(word) {
+  const rec = state.words[word];
+  const lvl = rec?.level ?? 0;
+  $('egg-info-pic').innerHTML = eggFor(eggStage(lvl));
+  $('egg-info-pic').className = 'egg-pop-pic' + (lvl ? ' wobble' + Math.max(1, eggStage(lvl)) : '');
+  $('egg-info-word').textContent = show(word);
+  renderDots($('egg-info-dots'), hatchProgress(rec, Date.now()));
+  $('egg-info-next').textContent = nextStep(rec, Date.now());
+  $('egg-info').hidden = false;
+  audio.chime.twinkle();
+  if (rec?.seen) audio.say(wordId(word), word);
+}
+$('egg-info-close').addEventListener('click', () => { $('egg-info').hidden = true; });
+$('egg-info').addEventListener('click', e => { if (e.target === $('egg-info')) $('egg-info').hidden = true; });
+$('egg-info-how').addEventListener('click', () => {
+  $('egg-info').hidden = true;
+  go('guide');
+  $('guide-eggs').scrollIntoView();
+});
 
 function hideEggPop() {
   $('egg-pop').hidden = true;
