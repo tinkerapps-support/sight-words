@@ -423,18 +423,8 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .egg-note { font-family: system-ui, sans-serif; font-size: 0.8rem; color: #7b6f80; max-width: 180px; text-align: center; }
 
 /* ---- Extra games: Bubble Pop + Build It (PLAN.md §10) ---- */
-.game-row { display: flex; gap: 10px; }
-.mid-btn {
-  flex: 1; padding: 10px 8px; border-radius: 999px;
-  font-size: 1.15rem; font-weight: 700; color: var(--pink-deep);
-  background: rgba(255,255,255,0.88); box-shadow: 0 4px 0 #e7b7cf, 0 6px 12px rgba(184,62,124,0.15);
-}
-.mid-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #e7b7cf; }
-.mid-btn .glyph.felt img { width: 1.4em; height: 1.4em; vertical-align: middle; }
-#game-screen { gap: 12px; }
-.game-dots { flex: 1; display: flex; justify-content: center; gap: 8px; }
-.game-dots i { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.75); box-shadow: inset 0 0 0 2px rgba(226,86,155,0.25); }
-.game-dots i.on { background: var(--pink); box-shadow: none; }
+.task { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.task-bar { padding: 6px 0 10px; }
 .big-btn.hear { font-size: 1.4rem; }
 
 .pop-area { flex: 1; position: relative; min-height: 0; }
@@ -456,7 +446,7 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 @keyframes bubble-pop { 60% { transform: scale(1.25); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
 @keyframes nudge { 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
 
-.build-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 48px; }
+.build-area { flex: 1; touch-action: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 48px; }
 .build-slots, .build-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .slot, .tile {
   width: min(18vw, 84px); aspect-ratio: 0.85; border-radius: 18px;
@@ -464,11 +454,13 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
   font-size: clamp(2.4rem, 13vw, 3.6rem); font-weight: 700; line-height: 1;
 }
 .slot { background: rgba(255,255,255,0.6); box-shadow: inset 0 -4px 0 rgba(201,182,255,0.55); }
-.slot .ghost { opacity: 0.18; }
+.slot .ghost { opacity: 0; transition: opacity 0.3s; }
+.slot.hint .ghost { opacity: 0.25; }
 .slot.filled { background: #fff; color: var(--pink-deep); animation: pop 0.25s ease-out; }
 .build-slots.done .slot { animation: hop 0.5s ease-out; }
 .tile { background: linear-gradient(180deg, #fff, var(--pink-soft)); color: var(--ink); box-shadow: 0 5px 0 #e7b7cf; }
-.tile:active { transform: translateY(3px); box-shadow: 0 2px 0 #e7b7cf; }
+.tile { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; position: relative; }
+.tile.dragging { z-index: 5; box-shadow: 0 14px 24px rgba(90,58,94,0.25); cursor: grabbing; }
 .tile.used { visibility: hidden; }
 .tile.nope { animation: nudge 0.45s; }
 .prog .next { display: block; margin-top: 4px; color: var(--pink-deep); font-weight: 600; }

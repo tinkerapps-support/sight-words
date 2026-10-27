@@ -20,7 +20,7 @@ export function newRecord() {
   return {
     level: 0, correctStreak: 0, fastStreak: 0, levelDay: null, levelSince: null,
     reviewIdx: 0, seen: 0, misses: 0, lastSeen: 0, nextDue: 0, headStart: false, history: [],
-    restUntil: 0, popCredit: 0,
+    restUntil: 0, popStreak: 0, built: false,
   };
 }
 
@@ -61,7 +61,7 @@ export const HATCH_STEPS = 6;
 export function hatchProgress(rec, now) {
   if (!rec || rec.level === 0) return { step: 0, waitingForTomorrow: false };
   if (rec.level >= 4) return { step: HATCH_STEPS, waitingForTomorrow: false };
-  if (rec.level === 1) return { step: 1 + Math.min(rec.correctStreak, 1), waitingForTomorrow: false };
+  if (rec.level === 1) return { step: 1 + Math.min(rec.popStreak || 0, 1), waitingForTomorrow: false };
   if (rec.level === 2) return { step: 3 + Math.min(rec.fastStreak, 1), waitingForTomorrow: false };
   return { step: 5, waitingForTomorrow: dayKey(now) === rec.levelDay };
 }
@@ -70,12 +70,13 @@ export function hatchProgress(rec, now) {
 export function nextStep(rec, now) {
   if (rec && (rec.restUntil || 0) > now) return 'Resting until tomorrow (missed 3 times today)';
   if (!rec || rec.level === 0) return rec?.seen ? 'Not started yet' : 'Meets it in a coming game';
-  if (rec.level === 1) return rec.correctStreak >= 1 ? 'Next: one more correct read' : 'Next: 2 correct reads in a row';
+  if (rec.level === 1) return rec.popStreak >= 1 ? 'Next: one more first-try bubble pop' : 'Next: pop its bubble on the first try, twice in a row';
   if (rec.level === 2) return rec.fastStreak >= 1 ? 'Next: one more Fast read' : 'Next: 2 Fast reads in a row';
   if (rec.level === 3) {
     return dayKey(now) === rec.levelDay ? 'Next: a Fast read tomorrow hatches it 🌙' : 'Next: a Fast read hatches it!';
   }
   if (rec.level === 4) {
+    if (!rec.built) return 'Hatched! Next: build (spell) it right on the first try';
     const crownAt = rec.levelSince + CONFIG.promoteKnownAfterDays * DAY;
     if (now >= crownAt) return 'Hatched! A Fast read now earns the crown';
     const day = new Date(crownAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -112,7 +113,7 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
   if (r === 'notyet') {
     rec.misses++;
     rec.correctStreak = 0;
-    rec.popCredit = 0;
+    rec.popStreak = 0;
     rec.fastStreak = 0;
     rec.reviewIdx = 0;
     const to = DROP_TO[rec.level];
@@ -130,7 +131,7 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
     } else if (rec.level === 3 && r === 'fast' && dayKey(now) !== rec.levelDay) {
       setLevel(rec, 4, now);
       rec.reviewIdx = 0;
-    } else if (rec.level === 4 && r === 'fast' && now - rec.levelSince >= CONFIG.promoteKnownAfterDays * DAY) {
+    } else if (rec.level === 4 && r === 'fast' && rec.built && now - rec.levelSince >= CONFIG.promoteKnownAfterDays * DAY) {
       setLevel(rec, 5, now);
     }
 
@@ -149,19 +150,53 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
   return { before, after: rec.level, hatched: before < 4 && rec.level >= 4 };
 }
 
-// Bubble Pop (PLAN.md §10): picking a word she hears is easier than reading it, so a correct
-// pop is half a Got it and only helps a Learning word (level 1). A Got it at level 2+ would only
-// reset her fast streak, so pops never touch those. Wrong pops count for nothing.
-export function applyPop(rec, now) {
+// Which kind of card a word gets, by stage (owner, 2026-10-27): Bubble Pop while it's Learning
+// (hearing it and finding it is the first step), reading while it's Getting it / Almost, and Build It
+// (spelling, the step beyond reading) once it has hatched: every time until it's built right on the
+// first try, then now and then.
+export function cardKind(rec, rng = Math.random) {
+  if (needsIntro(rec)) return 'intro';
+  if (rec.level <= 1) return 'pop';
+  if (rec.level <= 3) return 'read';
+  if (rec.level === 4) return rec.built ? 'read' : 'build';
+  return rng() < CONFIG.buildShareMastered ? 'build' : 'read';
+}
+
+function log(rec, entry) {
+  rec.history.push(entry);
+  if (rec.history.length > CONFIG.historyCap) rec.history.splice(0, rec.history.length - CONFIG.historyCap);
+}
+
+// A Bubble Pop card. firstTry: she popped the right bubble before any wrong one.
+// CONFIG.popsToLearn first-try pops in a row move a Learning word to Getting it (required:
+// it's the only way out of Learning). A wrong first pop is a miss: the streak starts over.
+export function applyPop(rec, firstTry, now) {
   const before = rec.level;
-  if (rec.level === 1) {
-    rec.popCredit = (rec.popCredit || 0) + 1;
-    if (rec.popCredit >= 2) {
-      rec.popCredit = 0;
-      rec.correctStreak++;
-      if (rec.correctStreak >= 2) { setLevel(rec, 2, now); rec.fastStreak = 0; }
-    }
+  rec.seen++;
+  rec.lastSeen = now;
+  log(rec, { t: now, r: firstTry ? 'pop' : 'popmiss', ms: 0, h: 0 });
+  if (rec.level === 0) setLevel(rec, 1, now);
+  if (!firstTry) {
+    rec.misses++;
+    rec.popStreak = 0;
+  } else if (rec.level === 1 && ++rec.popStreak >= CONFIG.popsToLearn) {
+    setLevel(rec, 2, now);
+    rec.popStreak = 0;
+    rec.correctStreak = 0;
+    rec.fastStreak = 0;
   }
+  rec.nextDue = now;
+  return { before, after: rec.level };
+}
+
+// A Build It card (hatched words). Built right on the first try (no wrong letter) marks the word
+// built, which the crown needs. Spelling is harder than reading, so a slip never lowers a word.
+export function applyBuild(rec, firstTry, now) {
+  const before = rec.level;
+  rec.seen++;
+  rec.lastSeen = now;
+  log(rec, { t: now, r: firstTry ? 'build' : 'buildhelp', ms: 0, h: 0 });
+  if (firstTry) rec.built = true;
   return { before, after: rec.level };
 }
 

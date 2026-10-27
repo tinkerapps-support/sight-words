@@ -94,12 +94,13 @@ let lastEnd = 0;
 let pending = null;
 
 // opts.onTime(seconds, duration) is called every frame while the line plays (word highlighting).
+// opts.now skips the gap: for a line the child or parent asked for with a tap ("Hear it").
 export function say(id, text, opts = {}) {
   stop();
   if (volume <= 0) return Promise.resolve();
   const token = {};
   pending = token;
-  const wait = Math.max(0, GAP - (performance.now() - lastEnd));
+  const wait = opts.now ? 0 : Math.max(0, GAP - (performance.now() - lastEnd));
   return new Promise(resolve => {
     const start = () => {
       if (pending !== token) { resolve(); return; } // replaced by another line during the gap

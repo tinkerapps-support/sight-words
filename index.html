@@ -31,10 +31,6 @@
     <div id="meadow" class="meadow"></div>
     <p id="meadow-count" class="meadow-count"></p>
     <button id="play" class="big-btn play">Play <span class="glyph" data-icon="ui-play">▶</span></button>
-    <div class="game-row">
-      <button id="play-pop" class="mid-btn"><span class="glyph" data-icon="ui-bubble">🫧</span> Bubble Pop</button>
-      <button id="play-build" class="mid-btn"><span class="glyph" data-icon="ui-build">🔤</span> Build It</button>
-    </div>
     <button id="stickers-btn" class="link-btn"><span class="glyph" data-icon="ui-star">⭐</span> <span id="sticker-count">0 stickers</span></button>
   </section>
 
@@ -53,12 +49,23 @@
           <button id="hint-sentence" class="hint-sentence"></button>
         </div>
       </div>
+      <!-- Bubble Pop / Build It cards (engine cardKind) -->
+      <div id="task" class="task" hidden>
+        <div id="pop-area" class="pop-area" hidden></div>
+        <div id="build-area" class="build-area" hidden>
+          <div id="build-slots" class="build-slots"></div>
+          <div id="build-tiles" class="build-tiles"></div>
+        </div>
+      </div>
       <div id="burst" class="burst" aria-hidden="true"></div>
       <div id="egg-pop" class="egg-pop" hidden aria-hidden="true">
         <div id="egg-pop-pic" class="egg-pop-pic"></div>
         <div id="egg-dots" class="egg-dots"></div>
         <div id="egg-note" class="egg-note" hidden>Read it fast tomorrow to hatch!</div>
       </div>
+    </div>
+    <div id="task-bar" class="task-bar" hidden>
+      <button id="task-hear" class="big-btn hear"><span class="glyph" data-icon="ui-speaker">🔊</span> Hear it</button>
     </div>
     <div id="teach-next" class="teach-next" hidden>
       <button id="next" class="big-btn">Next <span class="glyph" data-icon="ui-next">➜</span></button>
@@ -75,22 +82,6 @@
         <button id="btn-fast" class="answer fast"><span class="glyph" data-icon="ui-fast">⚡</span><span>Fast</span></button>
       </div>
     </footer>
-  </section>
-
-  <!-- Extra games: Bubble Pop and Build It (they check themselves) -->
-  <section id="game-screen" class="screen" hidden>
-    <header class="topbar">
-      <button id="game-quit" class="icon-btn small" aria-label="Stop"><span class="glyph" data-icon="ui-close">✕</span></button>
-      <div id="game-dots" class="game-dots" aria-hidden="true"></div>
-      <div id="game-mascot" class="mascot small idle">🦄</div>
-    </header>
-    <div id="pop-area" class="pop-area" hidden></div>
-    <div id="build-area" class="build-area" hidden>
-      <div id="build-slots" class="build-slots"></div>
-      <div id="build-tiles" class="build-tiles"></div>
-    </div>
-    <div id="game-burst" class="burst" aria-hidden="true"></div>
-    <button id="game-hear" class="big-btn hear"><span class="glyph" data-icon="ui-speaker">🔊</span> Hear it</button>
   </section>
 
   <!-- End of a session -->
@@ -197,15 +188,24 @@
 
       <h3>Eggs and friends</h3>
       <p>Every word has an egg in the meadow. It hatches into a little friend once the word is read
-        <b>Fast on two different days</b>, so it never hatches on the first day. After each correct
+        <b>Fast on two different days</b> (after its Bubble Pops), so it never hatches on the first day. After each correct
         card, the egg pops up with buttons that fill as the word gets closer. A moon on the last
         button means "come back tomorrow". Settings → Progress shows exactly what each word needs
         next.</p>
 
-      <h3>Bubble Pop and Build It</h3>
-      <p>Two extra games that check themselves, so your child can play them alone. Bubble Pop: hear
-        a word, pop its bubble. Build It: tap the letters in order. They use only words your child
-        has already met. They're good practice, but the reading game with you is what hatches eggs.</p>
+      <h3>Three kinds of cards</h3>
+      <p>The game changes with each word as your child learns it:</p>
+      <ul>
+        <li><b>Bubble Pop</b> for brand-new words. The voice says the word and your child pops the
+          bubble with it. Hearing a word and finding it is the first step; it checks itself, so you
+          just watch. Two first-try pops in a row move the word on.</li>
+        <li><b>Reading</b> once a word is familiar. Your child reads it and you tap Fast, Got it or Not
+          yet. Two Fast reads, then a Fast read on another day, hatch the egg.</li>
+        <li><b>Build It</b> once the egg has hatched. The voice says the word and your child drags the
+          letters into the boxes to spell it. Spelling is the step beyond reading, and getting it
+          right on the first try is part of earning the crown.</li>
+      </ul>
+      <p><b>Hear it</b> repeats the word on Bubble Pop and Build It cards.</p>
 
       <h3>A few tips</h3>
       <ul>
@@ -233,14 +233,14 @@
         when no hint was showing (Fast with a hint counts as Got it).</p>
       <ol>
         <li>Meets the word (new-word card)</li>
-        <li>2 correct reads in a row → <i>Getting it</i> (spotted egg)</li>
-        <li>2 Fast reads in a row → <i>Almost</i> (cracked egg)</li>
+        <li><b>Bubble Pop</b>: pops its bubble on the first try, twice in a row → <i>Getting it</i> (spotted egg)</li>
+        <li><b>Reading</b>: 2 Fast reads in a row → <i>Almost</i> (cracked egg)</li>
         <li>A Fast read on a <b>later day</b> → <i>Known</i>: it hatches</li>
-        <li>A Fast read 3+ days after that → <i>Mastered</i>: a crown</li>
+        <li><b>Build It</b>: spelled right on the first try, plus a Fast read 3+ days after hatching → <i>Mastered</i>: a crown</li>
       </ol>
       <p>Head-start words begin at Almost, so one Fast read on a later day hatches them. Not yet moves a
-        word back at most two levels. A creature never goes back into its egg. Bubble Pop can only help
-        with step 2.</p>
+        word back at most two levels (back to Bubble Pop if it slips that far). A creature never goes back
+        into its egg.</p>
     </details>
     <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
     <div id="progress-grid" class="progress-grid"></div>

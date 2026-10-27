@@ -1,6 +1,6 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
@@ -9,7 +9,7 @@ import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS,
 import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
-import { initGames, startGame, canPlay, gameWord } from './games.js';
+import { popCard, buildCard, clear as clearTask } from './games.js';
 
 const $ = id => document.getElementById(id);
 // Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
@@ -59,9 +59,9 @@ const levelOf = word => state.words[word]?.level ?? 0;
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'game-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+const SCREENS = ['home', 'play-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', game: 'game-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id === 'home') renderHome();
   if (id === 'setup-screen') renderSetup();
@@ -153,9 +153,6 @@ function renderHome() {
   }
   $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
   $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
-  // The extra games need words she has met (a head start counts).
-  $('play-pop').disabled = !canPlay('pop');
-  $('play-build').disabled = !canPlay('build');
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
 }
 $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
@@ -200,14 +197,6 @@ $('play').addEventListener('click', async () => {
   startSession('learn');
 });
 
-for (const [id, kind] of [['play-pop', 'pop'], ['play-build', 'build']]) {
-  $(id).addEventListener('click', async () => {
-    audio.unlock();
-    if (state.settings.fullscreen) await device.enterFullscreen();
-    startGame(kind);
-  });
-}
-
 // ---------------------------------------------------------------- play
 
 function entries() {
@@ -229,16 +218,17 @@ function startSession(kind) {
     queue = built.queue;
     clash = built.clash;
   }
-  session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 });
+  session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 && cardKind(state.words[w], () => 1) === 'read' });
   sessionStats = { cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
   renderMeter();
   if (state.settings.wakeLock) device.keepAwake(true);
+  sessionStats.told = {};   // the Bubble Pop / Build It how-to line is said once per game
   go('play');
+  // A brand-new word opens with its own intro lines; otherwise greet the game (card voices wait for it).
+  if (kind === 'learn' && !needsIntro(state.words[session.current])) audio.say('session-start', "Let's read some words!");
   showCard();
-  // A brand-new word opens with its own intro lines; otherwise greet the game.
-  if (kind === 'learn' && !card?.intro) audio.say('session-start', "Let's read some words!");
 }
 
 function renderMeter(full = false) {
@@ -279,6 +269,12 @@ function showCard() {
   const word = session.current;
   const level = levelOf(word);
   card = { word, level, shown: new Set(), start: performance.now(), timers: [] };
+  // Which card: Bubble Pop while Learning, reading in the middle, Build It once hatched.
+  card.kind = mode === 'meet' ? 'read' : cardKind(state.words[word]);
+  clearTask();
+  $('task').hidden = $('task-bar').hidden = true;
+  $('card').hidden = false;
+  if (card.kind === 'pop' || card.kind === 'build') { showTask(card); return; }
   const w = $('word');
   const text = show(word);
   w.innerHTML = `<span class="first">${text[0]}</span>${text.slice(1)}`;
@@ -333,6 +329,66 @@ function renderSentence(word) {
   // Before she answers, a tap reads it with the gap; while teaching, the whole sentence.
   $('hint-sentence').onclick = () => readSentence(word, { cloze: !$('card').classList.contains('teach') });
   $('hint').hidden = false;
+}
+
+// ---------------------------------------------------------------- Bubble Pop / Build It cards
+
+function showTask(c) {
+  const { word, kind } = c;
+  $('card').hidden = true;
+  $('task').hidden = $('task-bar').hidden = false;
+  $('pop-area').hidden = kind !== 'pop';
+  $('build-area').hidden = kind !== 'build';
+  $('parent-strip').hidden = true;
+  setMascot($('play-mascot'), 'think');
+  audio.chime.pop();
+  const onDone = firstTry => taskDone(c, firstTry);
+  if (kind === 'pop') popCard({ word, entries: entries(), show, onDone, onWrong: () => setMascot($('play-mascot'), 'gentle') });
+  else buildCard({ word, show, onDone });
+  // How-to once per game, then the word. Waits for the greeting instead of cutting it off.
+  audio.idle().then(async () => {
+    if (card !== c) return;
+    if (!sessionStats.told[kind]) {
+      sessionStats.told[kind] = true;
+      await (kind === 'pop'
+        ? audio.say('pop-start', 'Pop the bubble with the word you hear!')
+        : audio.say('build-start', "Let's build the word! Drag each letter into its box."));
+    }
+    if (card === c) audio.say(wordId(word), word);
+  });
+}
+$('task-hear').addEventListener('click', () => { if (card) audio.say(wordId(card.word), card.word, { now: true }); });
+
+// A Bubble Pop or Build It card is finished. A first-try pop is progress (2 in a row leave
+// Learning); a pop after a wrong bubble is a miss, and the word comes back later like a Not yet.
+function taskDone(c, firstTry) {
+  if (card !== c || busy) return;
+  busy = true;
+  const { word, kind } = c;
+  pushUndo(word);
+  const rec = record(state, word);
+  const stepBefore = hatchProgress(rec, Date.now()).step;
+  const res = kind === 'pop' ? applyPop(rec, firstTry, Date.now()) : applyBuild(rec, firstTry, Date.now());
+  const missed = kind === 'pop' && !firstTry;
+  session.answer(missed ? 'notyet' : 'got');
+  if (missed && session.missCount[word] >= CONFIG.restAfterMisses) {
+    restWord(rec, Date.now());
+    session.rest(word);
+  }
+  sessionStats.cards++;
+  persist();
+  if (missed) {
+    // No cheer, no fuss: hear the word once more while its bubble pops, then on to an easy card.
+    const s = session, token = ++celebrationToken;
+    audio.say(wordId(word), word).then(() => setTimeout(() => {
+      if (session !== s || token !== celebrationToken) return;
+      busy = false;
+      showCard();
+    }, 250));
+    return;
+  }
+  sessionStats.correct++;
+  celebrate(false, false, { word, before: res.before, after: res.after, stepBefore });
 }
 
 // Manual hint: next one not shown yet (sparkle, then sentence, then say it).
@@ -678,6 +734,7 @@ $('btn-undo').addEventListener('click', () => {
   celebrationToken++;
   hideEggPop();
   audio.stop();
+  clearTask();
   state.words[u.word] = u.rec;
   state.meter = u.meter;
   state.hatched = u.hatched;
@@ -704,6 +761,7 @@ $('quit').addEventListener('click', async () => {
   card = null;
   session = null;
   busy = false;
+  clearTask();
   go(mode === 'meet' ? 'settings' : 'home');
 });
 
@@ -959,5 +1017,4 @@ if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-initGames({ state: () => state, persist, go, show, pick, burst, setMascot, entries });
-window.__sightwords = { get state() { return state; }, gameWord }; // for the smoke test
+window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9 }; // for the smoke test

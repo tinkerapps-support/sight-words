@@ -20,7 +20,7 @@ export const OTHER = {
   'your-turn': 'Your turn! Can you say it?',
   'pop-start': 'Pop the bubble with the word you hear!',
   'try-again': 'Try another one!',
-  'build-start': "Let's build the word! Tap the letters in order.",
+  'build-start': "Let's build the word! Drag each letter into its box.",
 };
 
 export const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
