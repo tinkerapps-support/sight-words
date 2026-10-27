@@ -47,6 +47,8 @@ function warmSpeech() {
   speechSynthesis.speak(u);
 }
 
+export const clipCount = () => Object.keys(VOICE_CLIPS).length;
+
 export function hasClip(id) {
   return Boolean(VOICE_CLIPS[id]);
 }
@@ -83,9 +85,15 @@ export function say(id, text) {
       audio.currentTime = 0;
       audio.volume = volume;
       audio.onended = done;
-      audio.onerror = () => speak(text, done);
+      // Fall back to device speech only if the clip itself can't play: a clip cut off by the next
+      // line (pause() → AbortError) must stay cut off, not be re-read in the robotic voice.
+      const stillMine = () => current?.audio === audio;
+      audio.onerror = () => { if (stillMine()) speak(text, done); else done(); };
       current = { audio, resolve: done };
-      audio.play().catch(() => speak(text, done));
+      audio.play().catch(err => {
+        if (err?.name === 'AbortError' || !stillMine()) { done(); return; }
+        speak(text, done);
+      });
       return;
     }
     speak(text, done);

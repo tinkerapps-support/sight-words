@@ -700,6 +700,9 @@ $('setup-back').addEventListener('click', () => go('settings'));
 
 // ---------------------------------------------------------------- grown-up: settings
 
+// Shows whether the recorded (Codex) voice is in this copy of the app, or only the phone's voice.
+const voiceNote = () => (audio.clipCount() ? `recorded voice: ${audio.clipCount()} clips` : 'recorded voice: not loaded (phone voice)');
+
 function renderSettings() {
   const s = state.settings;
   $('set-fullscreen').checked = s.fullscreen;
@@ -732,8 +735,8 @@ function renderSettings() {
   // version.json exists only in the published copy (deploy-pages.mjs writes it).
   if (location.hostname.endsWith('github.io')) {
     fetch('version.json', { cache: 'no-store' }).then(r => r.json())
-      .then(v => { $('version').textContent = `Version ${v.version} · updated ${v.built}`; }).catch(() => {});
-  } else $('version').textContent = 'Version: local copy';
+      .then(v => { $('version').textContent = `Version ${v.version} · updated ${v.built} · ${voiceNote()}`; }).catch(() => {});
+  } else $('version').textContent = `Version: local copy · ${voiceNote()}`;
   const meetLeft = entries().filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).length;
   $('start-meet').disabled = meetLeft === 0;
 }
