@@ -1,11 +1,12 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
-import { wordId, sentenceId, cheerId, letterId, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
+import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
+import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
 
@@ -34,7 +35,9 @@ let card = null;           // { word, level, shown: Set, start, timers: [] }
 let undoStack = [];
 let sessionStats = null;
 let busy = false;
-let celebrationToken = 0;  // bumped by Undo/Quit so a pending celebration doesn't advance
+let celebrationToken = 0;
+let readToken = 0;         // bumped to stop a sentence being read (new card, new reading)
+let lockHolds = 0;         // >0 keeps the next step locked between voice lines (a cloze pause)  // bumped by Undo/Quit so a pending celebration doesn't advance
 
 const persist = () => save(state);
 const img = src => `<img src="${src}" alt="" draggable="false">`;
@@ -155,7 +158,7 @@ $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; r
 $('page-next').addEventListener('click', () => { audio.chime.whoosh(); page++; renderHome(); });
 $('fs-again').addEventListener('click', async () => { await device.enterFullscreen(); renderHome(); });
 device.onFullscreenChange(() => { if (!$('home').hidden) renderHome(); if (!$('settings-screen').hidden) renderSettings(); });
-$('stickers-btn').addEventListener('click', () => go('stickers'));
+$('stickers-btn').addEventListener('click', () => { bookPage = null; go('stickers'); });
 
 // Grown-up gate: hold the gear for 3 s.
 {
@@ -254,6 +257,7 @@ function clearTimers() {
 function showCard() {
   if (!session) return;
   clearTimers();
+  readToken++;
   $('teach-next').hidden = true;
   $('parent-strip').hidden = false;
   // (No unlock here: the strip stays locked while a voice line is still playing.)
@@ -293,19 +297,24 @@ function showHint(kind, faint = false) {
     if (!faint) audio.chime.twinkle();
   } else if (kind === 'sentence') {
     renderSentence(card.word);
+    // Read it as a hint: the voice pauses where the word goes, so she reads that part herself.
+    if (mode === 'learn') readSentence(card.word, { cloze: true });
   }
 }
 
 function renderSentence(word) {
   const e = wordEntry(word);
   if (!e) return;
-  const re = new RegExp(`\\b(${word})\\b`, 'gi');
-  $('hint-sentence').innerHTML = show(e.sentence).replace(re, m => `<b>${m}</b>`);
+  // One span per word so the reader can light each up; the target word is bold.
+  const isTarget = tok => tok.replace(/[^a-z]/gi, '').toLowerCase() === word.toLowerCase();
+  $('hint-sentence').innerHTML = e.sentence.split(/\s+/)
+    .map(tok => `<span class="tok${isTarget(tok) ? ' target' : ''}">${show(tok)}</span>`).join(' ');
   const pic = art(`sentence-${word.toLowerCase()}`);
   // No sentence picture yet: show only the sentence (the word's creature would mislead).
   $('hint-art').innerHTML = pic ? img(pic) : '';
   $('hint-art').hidden = !pic;
-  $('hint-sentence').onclick = () => audio.say(sentenceId(word), e.sentence);
+  // Before she answers, a tap reads it with the gap; while teaching, the whole sentence.
+  $('hint-sentence').onclick = () => readSentence(word, { cloze: !$('card').classList.contains('teach') });
   $('hint').hidden = false;
 }
 
@@ -350,8 +359,9 @@ function answer(result) {
     applyPlacement(rec, result, Date.now(), sessionStats.levelOnes);
     if (rec.level === 1 && result === 'notyet') sessionStats.levelOnes++;
   } else {
+    const stepBefore = hatchProgress(rec, Date.now()).step;
     const res = applyResult(rec, result, { hinted, ms, now: Date.now() });
-    change = { word, before: res.before, after: res.after };
+    change = { word, before: res.before, after: res.after, stepBefore };
     if (res.hatched && !state.hatched.includes(word)) {
       state.hatched.push(word);
       sessionStats.hatched.push(word);
@@ -382,7 +392,7 @@ const eggStage = lvl => (lvl >= 3 ? 3 : lvl >= 2 ? 2 : lvl >= 1 ? 1 : 0);
 
 // After a correct card: the word's egg pops up with its progress dots (4 to hatch).
 // A level gained shows the old egg turning into the new one. Hatched words show their creature.
-function eggPop({ word, before, after, hatching = false }) {
+function eggPop({ word, before, after, stepBefore = 0, hatching = false }) {
   const pop = $('egg-pop');
   const pic = $('egg-pop-pic');
   const dots = $('egg-dots');
@@ -397,12 +407,19 @@ function eggPop({ word, before, after, hatching = false }) {
     pic.innerHTML = eggFor(eggStage(up ? before : after));
     pic.classList.add('wobble' + Math.max(1, eggStage(after)));
   }
-  const filled = Math.min(after, 4);
+  // One felt button per step toward hatching (engine hatchProgress); a step gained pops in.
+  const prog = hatching ? { step: HATCH_STEPS - 1, waitingForTomorrow: false } : hatchProgress(state.words[word], Date.now());
+  const gained = !hatching && prog.step > stepBefore;
   const dotOn = art('dot-on'), dotOff = art('dot-off');
   dots.classList.toggle('felt', Boolean(dotOn && dotOff));
-  dots.innerHTML = Array.from({ length: 4 }, (_, i) =>
-    `<i class="${i < filled ? 'on' : ''}${up && i === filled - 1 && !hatched ? ' new' : ''}"></i>`).join('');
+  dots.innerHTML = Array.from({ length: HATCH_STEPS }, (_, i) => {
+    const cls = [i < prog.step ? 'on' : '', gained && i === prog.step - 1 ? 'new' : '',
+      prog.waitingForTomorrow && i === HATCH_STEPS - 1 ? 'tomorrow' : ''].filter(Boolean).join(' ');
+    return `<i class="${cls}"></i>`;
+  }).join('');
   dots.hidden = hatched;
+  // For the grown-up: why the last button won't fill today.
+  $('egg-note').hidden = !prog.waitingForTomorrow || hatched;
   pop.hidden = false;
   pop.classList.remove('show'); void pop.offsetWidth; pop.classList.add('show');
   if (up && !hatched) {
@@ -517,7 +534,68 @@ async function teach(word) {
   if (still()) await spellRead(word, still);
   if (still()) await pause(300);
   const entry = wordEntry(word);
-  if (still() && entry) await audio.say(sentenceId(word), entry.sentence);
+  if (still() && entry) await readSentence(word, { cloze: false });
+}
+
+// Reads the card's sentence, lighting up each word as it's spoken. cloze: the voice stops where
+// the target word goes, that spot pulses for CONFIG.clozePauseMs while she reads it, then the
+// sentence goes on. Clips: cloze-<word>-N (parts) or sentence-<word> (whole).
+async function readSentence(word, { cloze }) {
+  const e = wordEntry(word);
+  if (!e) return;
+  const mine = ++readToken;
+  const still = () => readToken === mine && card?.word === word;
+  const spans = [...$('hint-sentence').querySelectorAll('.tok')];
+  const parts = cloze ? clozeParts(e.sentence, word) : [{ text: e.sentence, id: sentenceId(word) }];
+  lockHolds++;
+  applyLock();
+  try {
+    let k = 0;
+    for (const part of parts) {
+      if (!still()) break;
+      if (part.gap) {
+        const gap = spans[k++];
+        gap?.classList.add('gap');
+        await new Promise(r => setTimeout(r, CONFIG.clozePauseMs));
+        gap?.classList.remove('gap');
+        continue;
+      }
+      const n = part.text.split(/\s+/).filter(Boolean).length;
+      await sayHighlighted(part.id, part.text, spans.slice(k, k + n));
+      k += n;
+    }
+  } finally {
+    spans.forEach(s => s.classList.remove('now', 'gap'));
+    lockHolds--;
+    applyLock();
+  }
+}
+
+// Plays one clip and lights its words in turn, from Whisper word timings when we have them,
+// otherwise spread over the clip by word length.
+async function sayHighlighted(id, text, spans) {
+  const t = TIMINGS[id];
+  const timed = t && t.length === spans.length;
+  const weights = spans.map(s => s.textContent.length + 1);
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  await audio.say(id, text, {
+    onTime: (sec, dur) => {
+      let idx = -1;
+      if (timed) {
+        if (sec >= t[0][0] - 0.05) idx = t.findIndex(([, end]) => sec < end + 0.05);
+        if (idx < 0 && sec >= t[0][0]) idx = spans.length - 1;
+      } else {
+        const lead = 0.15, body = Math.max(0.3, (dur || 1) - 0.55);
+        if (sec >= lead) {
+          let acc = 0;
+          idx = spans.length - 1;
+          for (let i = 0; i < spans.length; i++) { acc += (weights[i] / total) * body; if (sec - lead < acc) { idx = i; break; } }
+        }
+      }
+      spans.forEach((s, i) => s.classList.toggle('now', i === idx));
+    },
+  });
+  spans.forEach(s => s.classList.remove('now'));
 }
 
 // Spell–read: each letter lights up as its name is said, then the whole word ("w – a – s… was").
@@ -553,7 +631,7 @@ async function introduce(word) {
   if (still()) await audio.say(wordId(word), word);
   if (still()) await new Promise(r => setTimeout(r, 350));
   const entry = wordEntry(word);
-  if (still() && entry) await audio.say(sentenceId(word), entry.sentence);
+  if (still() && entry) await readSentence(word, { cloze: false });
   if (still()) await audio.say('your-turn', 'Your turn! Can you say it?');
 }
 $('next').addEventListener('click', () => {
@@ -651,14 +729,22 @@ function endSession() {
     if (!$('end-screen').hidden) audio.say('sticker', 'You earned a sticker!');
   });
 }
+let bookPage = null;
+$('book-prev').addEventListener('click', () => { audio.chime.whoosh(); bookPage--; renderStickers(); });
+$('book-next').addEventListener('click', () => { audio.chime.whoosh(); bookPage++; renderStickers(); });
 $('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
 
 function renderStickers() {
-  // A book of 20-sticker pages: earned stickers in order, then empty stitched spots.
+  // A book of 20-sticker pages (one per felt album page), opening on the newest page.
   const earned = state.stickers.map(stickerNum);
-  const spots = Math.max(STICKER_PAGE, Math.ceil(earned.length / STICKER_PAGE) * STICKER_PAGE);
+  const pages = Math.max(1, Math.ceil(earned.length / STICKER_PAGE));
+  if (bookPage === null || bookPage >= pages) bookPage = pages - 1;
+  const first = bookPage * STICKER_PAGE;
   const locked = art('sticker-locked');
-  $('sticker-grid').innerHTML = Array.from({ length: spots }, (_, i) => i < earned.length
+  $('book-page').textContent = pages > 1 ? `${bookPage + 1} / ${pages}` : '';
+  $('book-prev').style.visibility = bookPage > 0 ? 'visible' : 'hidden';
+  $('book-next').style.visibility = bookPage < pages - 1 ? 'visible' : 'hidden';
+  $('sticker-grid').innerHTML = Array.from({ length: STICKER_PAGE }, (_, j) => j + first).map(i => i < earned.length
     ? `<span class="got" style="--tilt:${((i * 37) % 13) - 6}deg">${stickerHtml(earned[i])}</span>`
     : `<span class="empty">${locked ? img(locked) : ''}</span>`).join('');
   $('sticker-note').textContent = earned.length ? '' : 'Finish a game to earn your first sticker!';
@@ -829,14 +915,14 @@ function renderProgress() {
 audio.configure(state.settings);
 // While a voice line plays, the next step waits: answers, Next and Yay! are locked until it ends.
 // Unlocking waits a beat so a sequence of lines (word → letters → sentence) stays locked between them.
-let unlockTimer = null;
-audio.onVoice(on => {
-  music.duck(on);
+let unlockTimer = null, voiceOn = false;
+function applyLock() {
   clearTimeout(unlockTimer);
   const set = v => ['parent-strip', 'teach-next', 'hatch-done'].forEach(id => $(id).classList.toggle('locked', v));
-  if (on) set(true);
+  if (voiceOn || lockHolds > 0) set(true);
   else unlockTimer = setTimeout(() => set(false), 450);
-});
+}
+audio.onVoice(on => { music.duck(on); voiceOn = on; applyLock(); });
 for (const s of SCREENS) $(s).hidden = true;
 document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
 if (art('meadow-bg')) document.body.classList.add('has-meadow');

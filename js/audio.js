@@ -79,7 +79,8 @@ const GAP = 320;
 let lastEnd = 0;
 let pending = null;
 
-export function say(id, text) {
+// opts.onTime(seconds, duration) is called every frame while the line plays (word highlighting).
+export function say(id, text, opts = {}) {
   stop();
   if (volume <= 0) return Promise.resolve();
   const token = {};
@@ -89,14 +90,24 @@ export function say(id, text) {
     const start = () => {
       if (pending !== token) { resolve(); return; } // replaced by another line during the gap
       pending = null;
-      play(id, text, resolve);
+      play(id, text, resolve, opts);
     };
     if (wait) setTimeout(start, wait); else start();
   });
 }
 
-function play(id, text, resolve) {
+function play(id, text, resolve, opts) {
   {
+    const follow = (getTime, getDuration) => {
+      if (!opts.onTime) return;
+      const mine = current;
+      const tick = () => {
+        if (current !== mine) return;
+        opts.onTime(getTime(), getDuration());
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
     voiceHook?.(true);
     const done = () => {
       if (current?.resolve === done) { current = null; lastEnd = performance.now(); voiceHook?.(false); }
@@ -114,6 +125,7 @@ function play(id, text, resolve) {
       const stillMine = () => current?.audio === audio;
       audio.onerror = () => { if (stillMine()) speak(text, done); else done(); };
       current = { audio, resolve: done };
+      follow(() => audio.currentTime, () => audio.duration || 0);
       audio.play().catch(err => {
         if (err?.name === 'AbortError' || !stillMine()) { done(); return; }
         speak(text, done);
@@ -121,6 +133,9 @@ function play(id, text, resolve) {
       return;
     }
     speak(text, done);
+    // Device voice: no clock to read, so estimate from the text.
+    const t0 = performance.now();
+    follow(() => (performance.now() - t0) / 1000, () => 0.5 + text.length * 0.075);
   }
 }
 

@@ -391,3 +391,33 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 /* A voice line is playing: the next step waits for it */
 .teach-next.locked .big-btn, #hatch-done.locked { opacity: 0.55; pointer-events: none; filter: saturate(0.7); }
 .parent-strip.locked .answer, .parent-strip.locked .tool { transition: opacity 0.2s; }
+
+/* Sentence read aloud: the word being spoken lights up; the gap pulses while she reads it */
+.hint-sentence .tok { display: inline-block; padding: 0 2px; border-radius: 8px; transition: color 0.12s, background 0.12s, transform 0.12s; }
+.hint-sentence .tok.target { color: var(--pink-deep); font-weight: 700; }
+.hint-sentence .tok.now { color: var(--ink); background: var(--r3); transform: translateY(-2px); }
+.hint-sentence .tok.gap { background: var(--r1); color: #fff; animation: gap-pulse 0.85s ease-in-out infinite; }
+@keyframes gap-pulse { 50% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(255,154,196,0.35); } }
+
+/* Felt sticker album: the 4x5 grid sits exactly on the page's stitched pockets (measured from
+   sticker-book.png: pockets span 4.9-95.6% across, 9.5-90.6% down). The page is stretched to the
+   screen so those percentages hold on any phone. */
+#sticker-screen.felt-book { background-size: 100% 100%; }
+#sticker-screen.felt-book .sticker-grid {
+  position: absolute; left: 4.9%; right: 4.4%; top: 9.5%; bottom: 9.4%; padding: 0;
+  grid-template-rows: repeat(5, 1fr); column-gap: 2.15%; row-gap: 2.47%; overflow: visible;
+}
+#sticker-screen.felt-book .sticker-grid span { aspect-ratio: auto; padding: 8%; }
+#sticker-screen.felt-book .sticker-grid span.empty img { width: 78%; height: auto; opacity: 0.75; }
+.book-pages { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ink); }
+.book-pages:empty { display: none; }
+#sticker-screen .topbar { padding-right: 48px; }
+
+/* Six felt buttons toward hatching; the last one sleeps (moon) until a fast read on another day */
+.egg-dots { gap: 6px; }
+.egg-dots i, .egg-dots.felt i { width: 20px; height: 20px; position: relative; }
+.egg-dots i.tomorrow::after {
+  content: ''; position: absolute; inset: -6px; background: url('../assets/art/sticker-16.webp') center / contain no-repeat;
+  animation: bob 2.4s ease-in-out infinite;
+}
+.egg-note { font-family: system-ui, sans-serif; font-size: 0.8rem; color: #7b6f80; max-width: 180px; text-align: center; }

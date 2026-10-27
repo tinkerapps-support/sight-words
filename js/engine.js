@@ -54,6 +54,18 @@ export function supportLevel(rec) {
   return s;
 }
 
+// Progress toward hatching, in steps a child can see move (the egg screen's felt buttons):
+// 1 learning, 2 one correct, 3 getting it, 4 one fast, 5 almost (fast today), 6 hatched/known.
+// At step 5 the last step needs a fast read on ANOTHER day: waitingForTomorrow says so.
+export const HATCH_STEPS = 6;
+export function hatchProgress(rec, now) {
+  if (!rec || rec.level === 0) return { step: 0, waitingForTomorrow: false };
+  if (rec.level >= 4) return { step: HATCH_STEPS, waitingForTomorrow: false };
+  if (rec.level === 1) return { step: 1 + Math.min(rec.correctStreak, 1), waitingForTomorrow: false };
+  if (rec.level === 2) return { step: 3 + Math.min(rec.fastStreak, 1), waitingForTomorrow: false };
+  return { step: 5, waitingForTomorrow: dayKey(now) === rec.levelDay };
+}
+
 // Missed CONFIG.restAfterMisses times in one game: rest it until tomorrow so a hard word
 // doesn't keep coming back to the same frustration; it returns fresh next session.
 export function restWord(rec, now) {

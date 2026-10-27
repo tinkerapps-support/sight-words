@@ -14,6 +14,7 @@ export const CONFIG = {
   promoteKnownAfterDays: 3,  // level 4 → 5 needs a Fast review this long after reaching 4
   reviewGapsDays: [1, 3, 7, 14, 30],
   meterBands: 7,
+  clozePauseMs: 1700,        // the pause where the word goes when a hint sentence is read
   historyCap: 60,
   // Automatic hints by level: when each one appears (ms after the card shows).
   hints: {
