@@ -162,7 +162,7 @@ button:disabled { opacity: 0.35; cursor: default; }
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 12px 4px; border-radius: 16px; font-size: 1.6rem; font-weight: 700;
 }
-.answer span { font-size: 0.85rem; font-weight: 600; }
+.answer span:not(.glyph) { font-size: 0.85rem; font-weight: 600; }
 .answer.notyet { background: #efe9f2; color: #7a6a80; }
 .answer.got { background: #d9f4e6; color: #2f7a55; }
 .answer.fast { background: #fff0c2; color: #9a6a00; }
@@ -332,3 +332,41 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .hatch .big-btn { position: relative; max-width: 360px; margin-top: 10px; animation: pop 0.4s ease-out; }
 .hatch .burst span { top: 40%; font-size: 2.2rem; }
 @keyframes appear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---- Felt pieces (Codex batch 2/2b); each falls back to the glyph/CSS look when missing ---- */
+.glyph.felt { display: inline-flex; align-items: center; justify-content: center; }
+.glyph.felt img { height: 1.3em; width: auto; display: block; }
+.icon-btn .glyph.felt img { height: 30px; }
+.icon-btn.small .glyph.felt img { height: 26px; }
+.answer .glyph.felt img { height: 40px; }
+.tool .glyph.felt img { height: 22px; }
+.big-btn .glyph.felt img { height: 1em; }
+.burst span img { width: 34px; height: 34px; object-fit: contain; display: block; }
+.meter i.felt { background: center / 100% 100% no-repeat; box-shadow: none; }
+.meter i.felt.on { background-color: transparent; }
+.egg-dots.felt i { width: 22px; height: 22px; box-shadow: none; background: url('../assets/art/dot-off.webp') center / contain no-repeat; }
+.egg-dots.felt i.on { background-image: url('../assets/art/dot-on.webp'); background-color: transparent; }
+.hatch.felt-bg { background: url('../assets/art/hatch-bg.webp') center / cover no-repeat; }
+.hatch.felt-bg .hatch-rays { display: none; }
+.hatch-glow { position: absolute; inset: -25%; opacity: 0; pointer-events: none; }
+.hatch-glow img { width: 100%; height: 100%; object-fit: contain; }
+.hatch.shaking .hatch-glow { animation: glow-build 1.7s ease-in forwards; }
+@keyframes glow-build { to { opacity: 0.7; transform: scale(0.9); } }
+.hatch.open .hatch-glow { animation: glow-burst 1.2s ease-out forwards; }
+@keyframes glow-burst { 0% { opacity: 0.8; transform: scale(0.9); } 30% { opacity: 1; transform: scale(1.4); } 100% { opacity: 0.55; transform: scale(1.2); } }
+.hatch-egg.halves img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.hatch.open .hatch-egg.halves { animation: none; }
+.hatch.open .hatch-egg.halves .shell-top { animation: cap-off 0.9s cubic-bezier(.2,.7,.4,1) forwards; }
+@keyframes cap-off { 0% { transform: none; } 35% { transform: translate(-6%, -38%) rotate(-25deg); } 100% { transform: translate(-60%, -95%) rotate(-80deg); opacity: 0; } }
+.hatch.open .hatch-egg.halves .shell-bottom { animation: base-drop 0.9s ease-in 0.15s forwards; }
+@keyframes base-drop { to { transform: translateY(35%) scale(0.9); opacity: 0; } }
+.hatch-shards { position: absolute; inset: 0; pointer-events: none; }
+.hatch-shards span { position: absolute; left: 40%; top: 40%; width: 20%; opacity: 0; }
+.hatch-shards span img { width: 100%; }
+.hatch.open .hatch-shards span { animation: shard 1s ease-out forwards; }
+.hatch-shards span:nth-child(1) { --sx: -150%; --sy: -120%; --sr: -200deg; }
+.hatch-shards span:nth-child(2) { --sx: 160%; --sy: -100%; --sr: 220deg; }
+.hatch-shards span:nth-child(3) { --sx: -180%; --sy: 60%; --sr: 160deg; }
+.hatch-shards span:nth-child(4) { --sx: 190%; --sy: 80%; --sr: -180deg; }
+.hatch-shards span:nth-child(5) { --sx: 10%; --sy: -190%; --sr: 260deg; }
+@keyframes shard { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(0.7); } }

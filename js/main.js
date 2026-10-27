@@ -220,7 +220,10 @@ function renderMeter(full = false) {
   m.innerHTML = '';
   for (let i = 0; i < CONFIG.meterBands; i++) {
     const b = document.createElement('i');
-    if (full || i < state.meter) b.className = 'on';
+    const on = full || i < state.meter;
+    if (on) b.className = 'on';
+    const tile = art(on ? `meter-${i + 1}` : 'meter-empty');
+    if (tile) { b.style.backgroundImage = `url(${tile})`; b.classList.add('felt'); }
     m.appendChild(b);
   }
   m.classList.toggle('full', full);
@@ -372,6 +375,8 @@ function eggPop({ word, before, after, hatching = false }) {
     pic.classList.add('wobble' + Math.max(1, eggStage(after)));
   }
   const filled = Math.min(after, 4);
+  const dotOn = art('dot-on'), dotOff = art('dot-off');
+  dots.classList.toggle('felt', Boolean(dotOn && dotOff));
   dots.innerHTML = Array.from({ length: 4 }, (_, i) =>
     `<i class="${i < filled ? 'on' : ''}${up && i === filled - 1 && !hatched ? ' new' : ''}"></i>`).join('');
   dots.hidden = hatched;
@@ -397,7 +402,15 @@ function hatchShow(word) {
     const h = $('hatch');
     const egg = $('hatch-egg');
     const friend = $('hatch-friend');
-    egg.innerHTML = eggFor(3);
+    const top = art('hatch-shell-top'), bottom = art('hatch-shell-bottom');
+    egg.innerHTML = top && bottom
+      ? `<img class="shell-bottom" src="${bottom}" alt=""><img class="shell-top" src="${top}" alt="">`
+      : eggFor(3);
+    egg.classList.toggle('halves', Boolean(top && bottom));
+    const glow = art('hatch-glow');
+    $('hatch-glow').innerHTML = glow ? img(glow) : '';
+    const shards = [1, 2, 3, 4, 5].map(i => art(`hatch-shard-${i}`)).filter(Boolean);
+    $('hatch-shards').innerHTML = shards.map(src => `<span>${img(src)}</span>`).join('');
     friend.innerHTML = creatureFor(word);
     $('hatch-word').textContent = show(word);
     $('hatch-done').hidden = true;
@@ -500,11 +513,16 @@ $('quit').addEventListener('click', async () => {
   go(mode === 'meet' ? 'settings' : 'home');
 });
 
+// Emoji → felt confetti piece (used once the fx-* art exists).
+const FX = { '⭐': 'fx-star', '💖': 'fx-heart', '✨': 'fx-sparkle', '⚡': 'fx-bolt', '🌈': 'fx-rainbow', '🎉': 'fx-flower', '🌸': 'fx-flower', '🟢': 'fx-pompom' };
+
 function burst(symbols, n = 10, host = $('burst')) {
   const b = host;
   for (let i = 0; i < n; i++) {
     const s = document.createElement('span');
-    s.textContent = symbols[i % symbols.length];
+    const sym = symbols[i % symbols.length];
+    const felt = art(FX[sym]);
+    if (felt) s.innerHTML = img(felt); else s.textContent = sym;
     const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 120;
     s.style.setProperty('--dx', `${Math.cos(a) * d}px`);
     s.style.setProperty('--dy', `${Math.sin(a) * d}px`);
@@ -704,6 +722,12 @@ audio.onVoice(on => music.duck(on));
 for (const s of SCREENS) $(s).hidden = true;
 document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
 if (art('meadow-bg')) document.body.classList.add('has-meadow');
+// Felt button icons from Codex replace the glyphs once they exist.
+document.querySelectorAll('[data-icon]').forEach(el => {
+  const src = art(el.dataset.icon);
+  if (src) { el.innerHTML = img(src); el.classList.add('felt'); }
+});
+if (art('hatch-bg')) $('hatch').classList.add('felt-bg');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

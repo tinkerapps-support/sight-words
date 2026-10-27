@@ -14,29 +14,29 @@
   <!-- Home: the Rainbow Meadow -->
   <section id="home" class="screen" hidden>
     <header class="topbar">
-      <button id="fs-again" class="icon-btn" hidden aria-label="Full screen">⛶</button>
+      <button id="fs-again" class="icon-btn" hidden aria-label="Full screen"><span class="glyph" data-icon="ui-fullscreen">⛶</span></button>
       <span class="spacer"></span>
       <button id="gear" class="icon-btn gear" aria-label="Settings (hold for 3 seconds)">
-        <svg class="hold-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg>⚙
+        <svg class="hold-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg><span class="glyph" data-icon="ui-settings">⚙</span>
       </button>
       <div id="gear-tip" class="gear-tip" hidden>Grown-ups: press and hold for 3 seconds</div>
     </header>
     <div class="mascot-wrap"><div id="home-mascot" class="mascot idle">🦄</div></div>
     <div class="meadow-head">
-      <button id="page-prev" class="icon-btn small" aria-label="Previous list">‹</button>
+      <button id="page-prev" class="icon-btn small" aria-label="Previous list"><span class="glyph" data-icon="ui-back">‹</span></button>
       <h2 id="meadow-title">Rainbow Meadow</h2>
-      <button id="page-next" class="icon-btn small" aria-label="Next list">›</button>
+      <button id="page-next" class="icon-btn small" aria-label="Next list"><span class="glyph" data-icon="ui-next">›</span></button>
     </div>
     <div id="meadow" class="meadow"></div>
     <p id="meadow-count" class="meadow-count"></p>
-    <button id="play" class="big-btn play">Play ▶</button>
-    <button id="stickers-btn" class="link-btn">⭐ <span id="sticker-count">0 stickers</span></button>
+    <button id="play" class="big-btn play">Play <span class="glyph" data-icon="ui-play">▶</span></button>
+    <button id="stickers-btn" class="link-btn"><span class="glyph" data-icon="ui-star">⭐</span> <span id="sticker-count">0 stickers</span></button>
   </section>
 
   <!-- Play: one word at a time -->
   <section id="play-screen" class="screen" hidden>
     <header class="topbar">
-      <button id="quit" class="icon-btn small" aria-label="Stop">✕</button>
+      <button id="quit" class="icon-btn small" aria-label="Stop"><span class="glyph" data-icon="ui-close">✕</span></button>
       <div id="meter" class="meter" aria-hidden="true"></div>
       <div id="play-mascot" class="mascot small idle">🦄</div>
     </header>
@@ -55,18 +55,18 @@
       </div>
     </div>
     <div id="teach-next" class="teach-next" hidden>
-      <button id="next" class="big-btn">Next ➜</button>
+      <button id="next" class="big-btn">Next <span class="glyph" data-icon="ui-next">➜</span></button>
     </div>
     <footer id="parent-strip" class="parent-strip">
       <div class="tools">
-        <button id="btn-hint" class="tool">💡 Hint</button>
-        <button id="btn-say" class="tool">🔊 Say it</button>
-        <button id="btn-undo" class="tool" disabled>↶ Undo</button>
+        <button id="btn-hint" class="tool"><span class="glyph" data-icon="ui-hint">💡</span> Hint</button>
+        <button id="btn-say" class="tool"><span class="glyph" data-icon="ui-speaker">🔊</span> Say it</button>
+        <button id="btn-undo" class="tool" disabled><span class="glyph" data-icon="ui-undo">↶</span> Undo</button>
       </div>
       <div class="answers">
-        <button id="btn-notyet" class="answer notyet">↺<span>Not yet</span></button>
-        <button id="btn-got" class="answer got">✓<span>Got it</span></button>
-        <button id="btn-fast" class="answer fast">⚡<span>Fast</span></button>
+        <button id="btn-notyet" class="answer notyet"><span class="glyph" data-icon="ui-notyet">↺</span><span>Not yet</span></button>
+        <button id="btn-got" class="answer got"><span class="glyph" data-icon="ui-check">✓</span><span>Got it</span></button>
+        <button id="btn-fast" class="answer fast"><span class="glyph" data-icon="ui-fast">⚡</span><span>Fast</span></button>
       </div>
     </footer>
   </section>
@@ -84,13 +84,13 @@
 
   <!-- Sticker page -->
   <section id="sticker-screen" class="screen" hidden>
-    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back">‹</button><h2>My stickers</h2><span class="spacer"></span></header>
+    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>My stickers</h2><span class="spacer"></span></header>
     <div id="sticker-grid" class="sticker-grid"></div>
   </section>
 
   <!-- Grown-up screens -->
   <section id="setup-screen" class="screen grown" hidden>
-    <header class="topbar"><button id="setup-back" class="icon-btn small back" aria-label="Back">‹</button><h2>Head start</h2><span class="spacer"></span></header>
+    <header class="topbar"><button id="setup-back" class="icon-btn small back" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Head start</h2><span class="spacer"></span></header>
     <p class="lead">For the grown-up: tap the words your child can <b>already read</b>. The first games
       start with these, so they're easy wins. You can change this any time in Settings.</p>
     <div id="setup-lists"></div>
@@ -100,7 +100,7 @@
   </section>
 
   <section id="settings-screen" class="screen grown" hidden>
-    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back">‹</button><h2>Settings</h2><span class="spacer"></span></header>
+    <header class="topbar"><button class="icon-btn small back" data-back="home" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Settings</h2><span class="spacer"></span></header>
     <div class="settings">
       <label class="setting"><span>Full screen</span><input type="checkbox" id="set-fullscreen" role="switch"></label>
       <p class="note" id="fs-note"></p>
@@ -142,7 +142,7 @@
   </section>
 
   <section id="progress-screen" class="screen grown" hidden>
-    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back">‹</button><h2>Progress</h2><span class="spacer"></span></header>
+    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Progress</h2><span class="spacer"></span></header>
     <p id="progress-week" class="lead"></p>
     <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
     <div id="progress-grid" class="progress-grid"></div>
@@ -153,7 +153,9 @@
   <div id="hatch" class="hatch" hidden>
     <div class="hatch-rays" aria-hidden="true"></div>
     <div class="hatch-stage">
+      <div id="hatch-glow" class="hatch-glow"></div>
       <div id="hatch-egg" class="hatch-egg"></div>
+      <div id="hatch-shards" class="hatch-shards"></div>
       <div id="hatch-friend" class="hatch-friend"></div>
       <div class="hatch-flash" aria-hidden="true"></div>
     </div>
