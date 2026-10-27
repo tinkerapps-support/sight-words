@@ -150,15 +150,31 @@ $('stickers-btn').addEventListener('click', () => go('stickers'));
 
 // Grown-up gate: hold the gear for 3 s.
 {
+  // Android Chrome can turn a long press into its own gesture (pointercancel), so the gear has
+  // touch-action: none and captures the pointer; a short tap explains what to do.
   const gear = $('gear');
-  let t = null;
-  const cancel = () => { clearTimeout(t); t = null; gear.classList.remove('holding'); };
+  let t = null, downAt = 0, tipTimer = null;
+  const tip = $('gear-tip');
+  const cancel = () => {
+    clearTimeout(t);
+    t = null;
+    gear.classList.remove('holding');
+    if (downAt && performance.now() - downAt < 2800) {
+      tip.hidden = false;
+      clearTimeout(tipTimer);
+      tipTimer = setTimeout(() => { tip.hidden = true; }, 2500);
+    }
+    downAt = 0;
+  };
   gear.addEventListener('pointerdown', e => {
     e.preventDefault();
+    try { gear.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    tip.hidden = true;
+    downAt = performance.now();
     gear.classList.add('holding');
-    t = setTimeout(() => { cancel(); go('settings'); }, 3000);
+    t = setTimeout(() => { downAt = 0; cancel(); go('settings'); }, 3000);
   });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => gear.addEventListener(ev, cancel));
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => gear.addEventListener(ev, () => { if (t) cancel(); }));
   gear.addEventListener('contextmenu', e => e.preventDefault());
 }
 
@@ -508,6 +524,11 @@ function renderSettings() {
     });
     lists.appendChild(c);
   }
+  // version.json exists only in the published copy (deploy-pages.mjs writes it).
+  if (location.hostname.endsWith('github.io')) {
+    fetch('version.json', { cache: 'no-store' }).then(r => r.json())
+      .then(v => { $('version').textContent = `Version ${v.version} · updated ${v.built}`; }).catch(() => {});
+  } else $('version').textContent = 'Version: local copy';
   const meetLeft = entries().filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).length;
   $('start-meet').disabled = meetLeft === 0;
 }

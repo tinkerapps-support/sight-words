@@ -257,3 +257,11 @@ body.has-meadow .meadow-count, body.has-meadow .link-btn, body.has-meadow .meado
   background: rgba(255,250,242,0.85); border-radius: 999px; padding: 4px 14px; align-self: center; justify-self: center;
 }
 body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(--ink); }
+
+.topbar { position: relative; }
+.gear { touch-action: none; -webkit-touch-callout: none; }
+.gear-tip {
+  position: absolute; top: 56px; right: 0; z-index: 5; max-width: 220px;
+  background: #fff; color: var(--ink); border-radius: 14px; padding: 8px 12px; font-size: 0.95rem;
+  box-shadow: 0 4px 14px rgba(90,58,94,0.2); font-family: system-ui, sans-serif;
+}
