@@ -343,7 +343,6 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .big-btn .glyph.felt img { height: 1em; }
 .burst span img { width: 34px; height: 34px; object-fit: contain; display: block; }
 .meter i.felt { background: center / 100% 100% no-repeat; box-shadow: none; }
-.meter i.felt.on { background-color: transparent; }
 .egg-dots.felt i { width: 22px; height: 22px; box-shadow: none; background: url('../assets/art/dot-off.webp') center / contain no-repeat; }
 .egg-dots.felt i.on { background-image: url('../assets/art/dot-on.webp'); background-color: transparent; }
 .hatch.felt-bg { background: url('../assets/art/hatch-bg.webp') center / cover no-repeat; }
@@ -379,3 +378,4 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
   content: '✨ new word ✨'; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
   background: var(--r3); color: var(--ink); font-weight: 700; padding: 4px 14px; border-radius: 999px; font-size: 1.1rem;
 }
+.hatch .burst span { animation-duration: 1.3s; }

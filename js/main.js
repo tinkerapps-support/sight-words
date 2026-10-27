@@ -224,7 +224,8 @@ function renderMeter(full = false) {
     const on = full || i < state.meter;
     if (on) b.className = 'on';
     const tile = art(on ? `meter-${i + 1}` : 'meter-empty');
-    if (tile) { b.style.backgroundImage = `url(${tile})`; b.classList.add('felt'); }
+    // Inline so the per-colour CSS fallback (a `background:` shorthand) can't wipe the felt patch.
+    if (tile) { b.style.background = `url(${tile}) center / 100% 100% no-repeat`; b.classList.add('felt'); }
     m.appendChild(b);
   }
   m.classList.toggle('full', full);
