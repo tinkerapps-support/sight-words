@@ -1,6 +1,8 @@
 {
+  "id": "./",
   "name": "Rainbow Words",
   "short_name": "Rainbow Words",
+  "description": "Sight word practice with a grown-up.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
@@ -8,6 +10,8 @@
   "background_color": "#ffe3f0",
   "theme_color": "#ffd6ea",
   "icons": [
-    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
