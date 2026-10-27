@@ -20,7 +20,44 @@ export function newRecord() {
   return {
     level: 0, correctStreak: 0, fastStreak: 0, levelDay: null, levelSince: null,
     reviewIdx: 0, seen: 0, misses: 0, lastSeen: 0, nextDue: 0, headStart: false, history: [],
+    restUntil: 0,
   };
+}
+
+// ---- Teaching support (PLAN.md §4) ----
+
+// A word she has never seen is introduced (modelled) before it is ever tested: errorless
+// teaching, the "model" step of model–lead–test.
+export function needsIntro(rec) {
+  return !rec || (rec.level === 0 && rec.seen === 0);
+}
+
+export function applyIntro(rec, now) {
+  rec.seen++;
+  rec.lastSeen = now;
+  rec.history.push({ t: now, r: 'intro', ms: 0, h: 1 });
+  if (rec.level < 1) setLevel(rec, 1, now);
+  rec.correctStreak = 0;
+  rec.nextDue = now;
+}
+
+// How much help a card gets: the word's level, stepped back after recent misses so support
+// rises right after a struggle and fades again with success (adaptive time delay).
+// Returns 1 (most help) .. 4+ (no automatic help).
+export function supportLevel(rec) {
+  if (!rec) return 1;
+  let s = Math.max(1, rec.level);
+  const recent = rec.history.filter(h => h.r !== 'intro').slice(-2);
+  const lastMiss = recent.length && recent[recent.length - 1].r === 'notyet';
+  if (recent.length === 2 && recent.every(h => h.r === 'notyet')) s = 1;
+  else if (lastMiss) s = Math.max(1, s - 1);
+  return s;
+}
+
+// Missed CONFIG.restAfterMisses times in one game: rest it until tomorrow so a hard word
+// doesn't keep coming back to the same frustration; it returns fresh next session.
+export function restWord(rec, now) {
+  rec.restUntil = startOfNextDay(now);
 }
 
 function setLevel(rec, level, now) {
@@ -132,7 +169,10 @@ export function buildSession({ records, entries, now, length, rng = Math.random 
   const budget = total - 1; // last card is the sure ending card
 
   // Shaky words (level 1–2), topped up with new words up to the cap.
-  const shaky = words.filter(w => level(w) === 1 || level(w) === 2);
+  const rested = w => (rec(w).restUntil || 0) > now;
+  const allShaky = words.filter(w => level(w) === 1 || level(w) === 2);
+  const awake = allShaky.filter(w => !rested(w));
+  const shaky = awake.length ? awake : allShaky;
   const maxShaky = starterMode ? CONFIG.starterMaxShaky : CONFIG.maxShaky;
   const fresh = words.filter(w => level(w) === 0 && !(starterMode && isStarter.has(w)));
   while (shaky.length < maxShaky && fresh.length) shaky.push(fresh.shift());
@@ -255,8 +295,11 @@ export function endingCard(words, rec, last, clash = (a, b) => a === b) {
 
 export class Session {
   // retries: false for "Meet the words", where each word is checked exactly once.
-  constructor({ queue, clash, rng = Math.random, retries = true }) {
+  // isSure(word): a word she reliably knows; after a miss the next card is one (a quick win).
+  constructor({ queue, clash, rng = Math.random, retries = true, isSure = null }) {
     this.allowRetries = retries;
+    this.isSure = isSure;
+    this.missCount = {};
     this.queue = queue.slice();
     this.clash = clash || ((a, b) => a === b);
     this.rng = rng;
@@ -275,7 +318,9 @@ export class Session {
     const word = this.current;
     this.results.push({ word, result });
     const isLast = this.index === this.queue.length - 1;
+    if (result === 'intro') { this.index++; return; }
     if (result === 'notyet') {
+      this.missCount[word] = (this.missCount[word] || 0) + 1;
       if (!this.allowRetries) { this.index++; return; }
       const n = this.retries[word] || 0;
       if (n < CONFIG.maxRetriesPerWord) {
@@ -293,9 +338,32 @@ export class Session {
         const sure = [...this.correctWords].find(w => !this.clash(w, word));
         if (sure) { this.queue.push(sure); this.extraEnd = true; }
       }
+      this.winNext(word);
     } else {
       this.correctWords.add(word);
     }
     this.index++;
+  }
+
+  // The word rests: remove its later cards this game (never the ending card).
+  rest(word) {
+    const end = this.queue.length - 1;
+    this.queue = this.queue.filter((w, i) => i <= this.index || i === end || w !== word);
+  }
+
+  // After a miss: if the next card isn't a sure word, swap in the nearest sure one from later
+  // in the queue (never the ending card), keeping look-alikes apart.
+  winNext(missed) {
+    if (!this.isSure) return;
+    const next = this.index + 1;
+    const last = this.queue.length - 1;
+    if (next >= last || this.isSure(this.queue[next])) return;
+    for (let j = next + 1; j < last; j++) {
+      const w = this.queue[j];
+      if (this.isSure(w) && !this.clash(w, missed) && w !== this.queue[next]) {
+        [this.queue[next], this.queue[j]] = [this.queue[j], this.queue[next]];
+        return;
+      }
+    }
   }
 }

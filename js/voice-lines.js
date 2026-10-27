@@ -16,6 +16,8 @@ export const OTHER = {
   'sticker': 'You earned a sticker!',
   'hatched': 'A new friend hatched!',
   'say-it-again': 'Can you say it too?',
+  'new-word': "Here's a new word!",
+  'your-turn': 'Your turn! Can you say it?',
 };
 
 export const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -23,6 +25,8 @@ export const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
 export const wordId = word => `word-${word.toLowerCase()}`;
 export const sentenceId = word => `sentence-${word.toLowerCase()}`;
 export const cheerId = text => `cheer-${slug(text)}`;
+export const letterId = ch => `letter-${ch.toLowerCase()}`;
+export const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 
 export function allLines() {
   const lines = [];
@@ -34,6 +38,8 @@ export function allLines() {
   }
   for (const t of [...CHEERS, ...FAST_CHEERS, ...NOT_YET]) lines.push({ id: cheerId(t), text: t, kind: 'cheer', where: 'feedback' });
   for (const [id, text] of Object.entries(OTHER)) lines.push({ id, text, kind: 'other', where: id });
+  // Letter names for spell–read ("w – a – s… was"). Upper case so the voice says the name.
+  for (const ch of LETTERS) lines.push({ id: letterId(ch), text: ch.toUpperCase(), kind: 'letter', where: 'spell-read' });
   // A word can appear in two lists: keep the first.
   const seen = new Set();
   return lines.filter(l => !seen.has(l.id) && seen.add(l.id));

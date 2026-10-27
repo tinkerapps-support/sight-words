@@ -1,11 +1,11 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
-import { wordId, sentenceId, cheerId, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
+import { wordId, sentenceId, cheerId, letterId, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
 import * as device from './device.js';
 import { art } from './art.js';
 
@@ -206,7 +206,7 @@ function startSession(kind) {
     queue = built.queue;
     clash = built.clash;
   }
-  session = new Session({ queue, clash, retries: kind !== 'meet' });
+  session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 });
   sessionStats = { cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
@@ -255,16 +255,19 @@ function showCard() {
   const text = show(word);
   w.innerHTML = `<span class="first">${text[0]}</span>${text.slice(1)}`;
   $('hint').hidden = true;
-  $('card').classList.remove('teach');
+  $('card').classList.remove('teach', 'intro');
   $('card').classList.remove('pop'); void $('card').offsetWidth; $('card').classList.add('pop');
   setMascot($('play-mascot'), 'think');
   audio.chime.pop();
   $('btn-hint').disabled = mode === 'meet';
   if (mode === 'learn') {
-    // A brand-new word (level 0) gets the full Learning help.
-    const plan = CONFIG.hints[Math.max(1, level)] || {};
+    // A word she has never seen is modelled first, not tested (introduce()).
+    if (needsIntro(state.words[word])) { introduce(word); return; }
+    // Help follows the word's level, stepped up right after a miss (engine supportLevel).
+    const support = supportLevel(state.words[word]);
+    const plan = CONFIG.hints[support] || {};
     for (const [kind, at] of Object.entries(plan)) {
-      card.timers.push(setTimeout(() => showHint(kind, level === 3 && kind === 'sparkle'), at));
+      card.timers.push(setTimeout(() => showHint(kind, support === 3 && kind === 'sparkle'), at));
     }
   }
 }
@@ -342,6 +345,10 @@ function answer(result) {
     }
   }
   session.answer(result);
+  if (mode === 'learn' && result === 'notyet' && session.missCount[word] >= CONFIG.restAfterMisses) {
+    restWord(rec, Date.now());
+    session.rest(word);
+  }
   sessionStats.cards++;
   persist();
 
@@ -490,10 +497,64 @@ async function teach(word) {
   await audio.say(cheerId(t), t);
   if (still()) await audio.say(wordId(word), word);
   if (still()) await pause(450);
+  if (still()) await spellRead(word, still);
+  if (still()) await pause(300);
   const entry = wordEntry(word);
   if (still() && entry) await audio.say(sentenceId(word), entry.sentence);
 }
-$('next').addEventListener('click', () => { audio.stop(); showCard(); });
+
+// Spell–read: each letter lights up as its name is said, then the whole word ("w – a – s… was").
+// Tying the letters to the word is what makes irregular words stick.
+async function spellRead(word, still) {
+  const letters = [...show(word)];
+  const w = $('word');
+  w.innerHTML = letters.map(ch => `<span class="ltr">${ch}</span>`).join('');
+  const spans = [...w.querySelectorAll('.ltr')];
+  for (let i = 0; i < letters.length && still(); i++) {
+    spans.forEach((s, j) => s.classList.toggle('lit', j === i));
+    await audio.say(letterId(letters[i]), letters[i].toUpperCase());
+    await new Promise(r => setTimeout(r, 120));
+  }
+  if (!still()) return;
+  spans.forEach(s => s.classList.add('lit'));
+  await audio.say(wordId(word), word);
+  spans.forEach(s => s.classList.remove('lit'));
+}
+
+// A brand-new word: shown with its picture sentence, said, read in its sentence, then she says
+// it back. Nothing is scored; it becomes a Learning word and is tested later this game.
+async function introduce(word) {
+  card.intro = true;
+  setMascot($('play-mascot'), 'gentle');
+  $('card').classList.add('teach', 'intro');
+  renderSentence(word);
+  $('parent-strip').hidden = true;
+  $('teach-next').hidden = false;
+  $('next').dataset.intro = '1';
+  const still = () => card?.word === word && card.intro && !$('teach-next').hidden;
+  await audio.say('new-word', "Here's a new word!");
+  if (still()) await audio.say(wordId(word), word);
+  if (still()) await new Promise(r => setTimeout(r, 350));
+  const entry = wordEntry(word);
+  if (still() && entry) await audio.say(sentenceId(word), entry.sentence);
+  if (still()) await audio.say('your-turn', 'Your turn! Can you say it?');
+}
+$('next').addEventListener('click', () => {
+  audio.stop();
+  if ($('next').dataset.intro === '1' && card?.intro) {
+    delete $('next').dataset.intro;
+    undoStack.push({
+      word: card.word, rec: structuredClone(record(state, card.word)), meter: state.meter, hatched: state.hatched.slice(),
+      stats: structuredClone(sessionStats),
+      session: { queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords], extraEnd: session.extraEnd, results: session.results.slice() },
+    });
+    applyIntro(record(state, card.word), Date.now());
+    session.answer('intro');
+    persist();
+  }
+  delete $('next').dataset.intro;
+  showCard();
+});
 
 $('btn-undo').addEventListener('click', () => {
   const u = undoStack.pop();

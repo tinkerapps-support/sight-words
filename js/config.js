@@ -10,6 +10,7 @@ export const CONFIG = {
   irSteps: 3,                // T,K1 · T,K1,K2 · T,K1,K2,K3
   notYetGap: [2, 3],         // a missed word comes back this many cards later
   maxRetriesPerWord: 2,
+  restAfterMisses: 3,        // misses in one game before a word rests until tomorrow
   promoteKnownAfterDays: 3,  // level 4 → 5 needs a Fast review this long after reaching 4
   reviewGapsDays: [1, 3, 7, 14, 30],
   meterBands: 7,

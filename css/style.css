@@ -370,3 +370,12 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .hatch-shards span:nth-child(4) { --sx: 190%; --sy: 80%; --sr: -180deg; }
 .hatch-shards span:nth-child(5) { --sx: 10%; --sy: -190%; --sr: 260deg; }
 @keyframes shard { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(0.7); } }
+
+/* Spell–read: one letter lit at a time */
+.word .ltr { display: inline-block; transition: color 0.15s, transform 0.15s; }
+.word .ltr.lit { color: var(--pink-deep); transform: translateY(-6px) scale(1.12); }
+.card { position: relative; }
+.card.intro::before {
+  content: '✨ new word ✨'; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: var(--r3); color: var(--ink); font-weight: 700; padding: 4px 14px; border-radius: 999px; font-size: 1.1rem;
+}
