@@ -252,3 +252,8 @@ body.has-meadow .friend.hatched { background: transparent; box-shadow: none; }
 .math input:focus { outline: none; border-color: var(--pink-deep); }
 .math-wrong { margin: 0; color: #c0392b; font-size: 0.9rem; }
 .setting .note { margin: 0; }
+
+body.has-meadow .meadow-count, body.has-meadow .link-btn, body.has-meadow .meadow-head h2 {
+  background: rgba(255,250,242,0.85); border-radius: 999px; padding: 4px 14px; align-self: center; justify-self: center;
+}
+body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(--ink); }

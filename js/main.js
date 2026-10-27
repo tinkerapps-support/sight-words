@@ -139,7 +139,7 @@ function renderHome() {
     m.appendChild(b);
   }
   $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
-  $('sticker-count').textContent = state.stickers.length;
+  $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
 }
 $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
@@ -267,7 +267,9 @@ function renderSentence(word) {
   const re = new RegExp(`\\b(${word})\\b`, 'gi');
   $('hint-sentence').innerHTML = show(e.sentence).replace(re, m => `<b>${m}</b>`);
   const pic = art(`sentence-${word.toLowerCase()}`);
-  $('hint-art').innerHTML = pic ? img(pic) : creatureFor(word);
+  // No sentence picture yet: show only the sentence (the word's creature would mislead).
+  $('hint-art').innerHTML = pic ? img(pic) : '';
+  $('hint-art').hidden = !pic;
   $('hint-sentence').onclick = () => audio.say(sentenceId(word), e.sentence);
   $('hint').hidden = false;
 }
