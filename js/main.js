@@ -256,7 +256,7 @@ function showCard() {
   clearTimers();
   $('teach-next').hidden = true;
   $('parent-strip').hidden = false;
-  $('parent-strip').classList.remove('locked');
+  // (No unlock here: the strip stays locked while a voice line is still playing.)
   $('btn-undo').disabled = !undoStack.length;
   if (session.done) { endSession(); return; }
   const word = session.current;
@@ -473,8 +473,9 @@ function celebrate(fast, hatchedNow, change) {
   renderMeter(full);
   if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); }
   // A voice cheer now and then, not on every card (never over a hatching).
-  if (full && !hatchedNow) audio.say('rainbow-full', 'A whole rainbow!');
-  else if (!hatchedNow && Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); audio.say(cheerId(t), t); }
+  let cheer = Promise.resolve();
+  if (full && !hatchedNow) cheer = audio.say('rainbow-full', 'A whole rainbow!');
+  else if (!hatchedNow && Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); cheer = audio.say(cheerId(t), t); }
   // Stale if the parent stopped or undid meanwhile (Undo/Quit replace the session state).
   const s = session, token = ++celebrationToken;
   const next = () => {
@@ -490,8 +491,10 @@ function celebrate(fast, hatchedNow, change) {
     }, 900);
     return;
   }
+  // The next card comes once both the egg moment and any cheer are done.
   const wait = change ? eggPop(change) : 900;
-  setTimeout(next, Math.max(wait, full ? 1500 : 0));
+  const timer = new Promise(r => setTimeout(r, Math.max(wait, full ? 1500 : 0)));
+  Promise.all([timer, cheer]).then(() => setTimeout(next, 200));
 }
 
 // Not yet: show the word with its sentence, say it, let her repeat, then the parent taps Next.
@@ -824,7 +827,16 @@ function renderProgress() {
 // ---------------------------------------------------------------- boot
 
 audio.configure(state.settings);
-audio.onVoice(on => music.duck(on));
+// While a voice line plays, the next step waits: answers, Next and Yay! are locked until it ends.
+// Unlocking waits a beat so a sequence of lines (word → letters → sentence) stays locked between them.
+let unlockTimer = null;
+audio.onVoice(on => {
+  music.duck(on);
+  clearTimeout(unlockTimer);
+  const set = v => ['parent-strip', 'teach-next', 'hatch-done'].forEach(id => $(id).classList.toggle('locked', v));
+  if (on) set(true);
+  else unlockTimer = setTimeout(() => set(false), 450);
+});
 for (const s of SCREENS) $(s).hidden = true;
 document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
 if (art('meadow-bg')) document.body.classList.add('has-meadow');

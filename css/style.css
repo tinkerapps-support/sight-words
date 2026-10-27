@@ -387,3 +387,7 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
   background: var(--r3); color: var(--ink); font-weight: 700; padding: 4px 14px; border-radius: 999px; font-size: 1.1rem;
 }
 .hatch .burst span { animation-duration: 1.3s; }
+
+/* A voice line is playing: the next step waits for it */
+.teach-next.locked .big-btn, #hatch-done.locked { opacity: 0.55; pointer-events: none; filter: saturate(0.7); }
+.parent-strip.locked .answer, .parent-strip.locked .tool { transition: opacity 0.2s; }

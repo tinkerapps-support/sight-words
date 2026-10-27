@@ -63,7 +63,9 @@ export function preload(ids) {
 }
 
 export function stop() {
+  pending = null;
   if (!current) return;
+  lastEnd = performance.now();
   if (current.audio) { current.audio.pause(); current.audio.currentTime = 0; }
   if (current.utterance && 'speechSynthesis' in window) { speechSynthesis.cancel(); lastCancel = performance.now(); }
   current.resolve?.();
@@ -72,12 +74,34 @@ export function stop() {
 
 // Plays a clip by id, or speaks `text` with the device voice if the clip doesn't exist.
 // Resolves when it ends, is cut off, or can't play at all (never hangs the game).
+// Lines never run together: a new line starts at least GAP ms after the last one ended.
+const GAP = 320;
+let lastEnd = 0;
+let pending = null;
+
 export function say(id, text) {
   stop();
   if (volume <= 0) return Promise.resolve();
+  const token = {};
+  pending = token;
+  const wait = Math.max(0, GAP - (performance.now() - lastEnd));
   return new Promise(resolve => {
+    const start = () => {
+      if (pending !== token) { resolve(); return; } // replaced by another line during the gap
+      pending = null;
+      play(id, text, resolve);
+    };
+    if (wait) setTimeout(start, wait); else start();
+  });
+}
+
+function play(id, text, resolve) {
+  {
     voiceHook?.(true);
-    const done = () => { if (current?.resolve === done) { current = null; voiceHook?.(false); } resolve(); };
+    const done = () => {
+      if (current?.resolve === done) { current = null; lastEnd = performance.now(); voiceHook?.(false); }
+      resolve();
+    };
     const file = VOICE_CLIPS[id];
     if (file) {
       const audio = cache.get(id) || new Audio(`assets/voice/${file}`);
@@ -97,7 +121,7 @@ export function say(id, text) {
       return;
     }
     speak(text, done);
-  });
+  }
 }
 
 function speak(text, done) {
