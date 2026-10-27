@@ -9,6 +9,7 @@ import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS,
 import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
+import { initGames, startGame, canPlay, gameWord } from './games.js';
 
 const $ = id => document.getElementById(id);
 // Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
@@ -35,9 +36,9 @@ let card = null;           // { word, level, shown: Set, start, timers: [] }
 let undoStack = [];
 let sessionStats = null;
 let busy = false;
-let celebrationToken = 0;
+let celebrationToken = 0;  // bumped by Undo/Quit so a pending celebration doesn't advance
 let readToken = 0;         // bumped to stop a sentence being read (new card, new reading)
-let lockHolds = 0;         // >0 keeps the next step locked between voice lines (a cloze pause)  // bumped by Undo/Quit so a pending celebration doesn't advance
+let lockHolds = 0;         // >0 keeps the next step locked between voice lines (a cloze pause)
 
 const persist = () => save(state);
 const img = src => `<img src="${src}" alt="" draggable="false">`;
@@ -58,9 +59,9 @@ const levelOf = word => state.words[word]?.level ?? 0;
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+const SCREENS = ['home', 'play-screen', 'game-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', stickers: 'sticker-screen', play: 'play-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', stickers: 'sticker-screen', play: 'play-screen', game: 'game-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id === 'home') renderHome();
   if (id === 'setup-screen') renderSetup();
@@ -152,6 +153,9 @@ function renderHome() {
   }
   $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
   $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
+  // The extra games need words she has met (a head start counts).
+  $('play-pop').disabled = !canPlay('pop');
+  $('play-build').disabled = !canPlay('build');
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
 }
 $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
@@ -195,6 +199,14 @@ $('play').addEventListener('click', async () => {
   if (state.settings.fullscreen) await device.enterFullscreen();
   startSession('learn');
 });
+
+for (const [id, kind] of [['play-pop', 'pop'], ['play-build', 'build']]) {
+  $(id).addEventListener('click', async () => {
+    audio.unlock();
+    if (state.settings.fullscreen) await device.enterFullscreen();
+    startGame(kind);
+  });
+}
 
 // ---------------------------------------------------------------- play
 
@@ -259,6 +271,7 @@ function showCard() {
   clearTimers();
   readToken++;
   $('teach-next').hidden = true;
+  delete $('next').dataset.intro; // left over if the parent stopped during an intro card
   $('parent-strip').hidden = false;
   // (No unlock here: the strip stays locked while a voice line is still playing.)
   $('btn-undo').disabled = !undoStack.length;
@@ -298,7 +311,11 @@ function showHint(kind, faint = false) {
   } else if (kind === 'sentence') {
     renderSentence(card.word);
     // Read it as a hint: the voice pauses where the word goes, so she reads that part herself.
-    if (mode === 'learn') readSentence(card.word, { cloze: true });
+    // Waits for any line already playing (the game's greeting) instead of cutting it off.
+    const mine = card;
+    if (mode === 'learn') audio.idle().then(() => {
+      if (card === mine && !busy && !$('card').classList.contains('teach')) readSentence(mine.word, { cloze: true });
+    });
   }
 }
 
@@ -346,12 +363,7 @@ function answer(result) {
   const hinted = card.shown.size > 0;
   const ms = performance.now() - card.start;
   const rec = record(state, word);
-  undoStack.push({
-    word, rec: structuredClone(rec), meter: state.meter, hatched: state.hatched.slice(),
-    stats: structuredClone(sessionStats),
-    session: { queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords], extraEnd: session.extraEnd, results: session.results.slice() },
-  });
-  if (undoStack.length > 5) undoStack.shift();
+  pushUndo(word);
 
   let hatchedNow = false;
   let change = null;
@@ -638,11 +650,7 @@ $('next').addEventListener('click', () => {
   audio.stop();
   if ($('next').dataset.intro === '1' && card?.intro) {
     delete $('next').dataset.intro;
-    undoStack.push({
-      word: card.word, rec: structuredClone(record(state, card.word)), meter: state.meter, hatched: state.hatched.slice(),
-      stats: structuredClone(sessionStats),
-      session: { queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords], extraEnd: session.extraEnd, results: session.results.slice() },
-    });
+    pushUndo(card.word);
     applyIntro(record(state, card.word), Date.now());
     session.answer('intro');
     persist();
@@ -650,6 +658,19 @@ $('next').addEventListener('click', () => {
   delete $('next').dataset.intro;
   showCard();
 });
+
+// Everything a card can change, so Undo puts it all back.
+function pushUndo(word) {
+  undoStack.push({
+    word, rec: structuredClone(record(state, word)), meter: state.meter, hatched: state.hatched.slice(),
+    stats: structuredClone(sessionStats),
+    session: {
+      queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords],
+      extraEnd: session.extraEnd, results: session.results.slice(), missCount: { ...session.missCount },
+    },
+  });
+  if (undoStack.length > 5) undoStack.shift();
+}
 
 $('btn-undo').addEventListener('click', () => {
   const u = undoStack.pop();
@@ -664,6 +685,7 @@ $('btn-undo').addEventListener('click', () => {
   Object.assign(session, {
     queue: u.session.queue, index: u.session.index, retries: u.session.retries,
     correctWords: new Set(u.session.correct), extraEnd: u.session.extraEnd, results: u.session.results,
+    missCount: u.session.missCount,
   });
   persist();
   busy = false;
@@ -936,4 +958,5 @@ if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-window.__sightwords = { get state() { return state; } }; // for the smoke test
+initGames({ state: () => state, persist, go, show, pick, burst, setMascot, entries });
+window.__sightwords = { get state() { return state; }, gameWord }; // for the smoke test

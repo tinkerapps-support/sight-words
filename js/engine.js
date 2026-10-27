@@ -20,7 +20,7 @@ export function newRecord() {
   return {
     level: 0, correctStreak: 0, fastStreak: 0, levelDay: null, levelSince: null,
     reviewIdx: 0, seen: 0, misses: 0, lastSeen: 0, nextDue: 0, headStart: false, history: [],
-    restUntil: 0,
+    restUntil: 0, popCredit: 0,
   };
 }
 
@@ -94,6 +94,7 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
   if (r === 'notyet') {
     rec.misses++;
     rec.correctStreak = 0;
+    rec.popCredit = 0;
     rec.fastStreak = 0;
     rec.reviewIdx = 0;
     const to = DROP_TO[rec.level];
@@ -128,6 +129,22 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
     }
   }
   return { before, after: rec.level, hatched: before < 4 && rec.level >= 4 };
+}
+
+// Bubble Pop (PLAN.md §10): picking a word she hears is easier than reading it, so a correct
+// pop is half a Got it and only helps a Learning word (level 1). A Got it at level 2+ would only
+// reset her fast streak, so pops never touch those. Wrong pops count for nothing.
+export function applyPop(rec, now) {
+  const before = rec.level;
+  if (rec.level === 1) {
+    rec.popCredit = (rec.popCredit || 0) + 1;
+    if (rec.popCredit >= 2) {
+      rec.popCredit = 0;
+      rec.correctStreak++;
+      if (rec.correctStreak >= 2) { setLevel(rec, 2, now); rec.fastStreak = 0; }
+    }
+  }
+  return { before, after: rec.level };
 }
 
 // "Words she already knows" (PLAN.md §3): marked words start at level 3, never lowered.
@@ -183,11 +200,11 @@ export function buildSession({ records, entries, now, length, rng = Math.random 
   // Shaky words (level 1–2), topped up with new words up to the cap.
   const rested = w => (rec(w).restUntil || 0) > now;
   const allShaky = words.filter(w => level(w) === 1 || level(w) === 2);
-  const awake = allShaky.filter(w => !rested(w));
-  const shaky = awake.length ? awake : allShaky;
+  // A resting word still counts toward the shaky cap (so it isn't replaced by new words today).
+  const shaky = allShaky.filter(w => !rested(w));
   const maxShaky = starterMode ? CONFIG.starterMaxShaky : CONFIG.maxShaky;
   const fresh = words.filter(w => level(w) === 0 && !(starterMode && isStarter.has(w)));
-  while (shaky.length < maxShaky && fresh.length) shaky.push(fresh.shift());
+  for (let room = maxShaky - allShaky.length; room > 0 && fresh.length; room--) shaky.push(fresh.shift());
 
   const nTargets = starterMode ? CONFIG.starterTargets : CONFIG.targetsPerSession;
   const targets = [...shaky]

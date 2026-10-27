@@ -23,6 +23,12 @@ export function unlock() {
 
 export const audioContext = () => ctx;
 
+// Android suspends Web Audio when the app goes to the background; wake it on return
+// (allowed without a new tap once the page has had one).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+});
+
 // Called with true when a voice line starts and false when it ends (the music dips under it).
 let voiceHook = null;
 export function onVoice(fn) { voiceHook = fn; }
@@ -48,6 +54,14 @@ function warmSpeech() {
 }
 
 export const clipCount = () => Object.keys(VOICE_CLIPS).length;
+
+// Resolves once no line is playing or waiting to play (a hint waits for the greeting).
+export function idle() {
+  return new Promise(resolve => {
+    const check = () => (current || pending ? setTimeout(check, 80) : resolve());
+    check();
+  });
+}
 
 export function hasClip(id) {
   return Boolean(VOICE_CLIPS[id]);
@@ -127,7 +141,9 @@ function play(id, text, resolve, opts) {
       current = { audio, resolve: done };
       follow(() => audio.currentTime, () => audio.duration || 0);
       audio.play().catch(err => {
-        if (err?.name === 'AbortError' || !stillMine()) { done(); return; }
+        // Already handled: stop() resolved it, or onerror moved it to device speech.
+        if (!stillMine()) return;
+        if (err?.name === 'AbortError') { done(); return; }
         speak(text, done);
       });
       return;

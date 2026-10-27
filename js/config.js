@@ -16,6 +16,7 @@ export const CONFIG = {
   meterBands: 7,
   clozePauseMs: 1700,        // the pause where the word goes when a hint sentence is read
   historyCap: 60,
+  games: { rounds: 6 },      // Bubble Pop / Build It rounds per game
   // Automatic hints by level: when each one appears (ms after the card shows).
   hints: {
     1: { sentence: 0, sparkle: 3000 },

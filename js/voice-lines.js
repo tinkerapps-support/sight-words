@@ -18,6 +18,9 @@ export const OTHER = {
   'say-it-again': 'Can you say it too?',
   'new-word': "Here's a new word!",
   'your-turn': 'Your turn! Can you say it?',
+  'pop-start': 'Pop the bubble with the word you hear!',
+  'try-again': 'Try another one!',
+  'build-start': "Let's build the word! Tap the letters in order.",
 };
 
 export const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

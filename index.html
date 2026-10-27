@@ -30,6 +30,10 @@
     <div id="meadow" class="meadow"></div>
     <p id="meadow-count" class="meadow-count"></p>
     <button id="play" class="big-btn play">Play <span class="glyph" data-icon="ui-play">▶</span></button>
+    <div class="game-row">
+      <button id="play-pop" class="mid-btn"><span class="glyph" data-icon="ui-bubble">🫧</span> Bubble Pop</button>
+      <button id="play-build" class="mid-btn"><span class="glyph" data-icon="ui-build">🔤</span> Build It</button>
+    </div>
     <button id="stickers-btn" class="link-btn"><span class="glyph" data-icon="ui-star">⭐</span> <span id="sticker-count">0 stickers</span></button>
   </section>
 
@@ -70,6 +74,22 @@
         <button id="btn-fast" class="answer fast"><span class="glyph" data-icon="ui-fast">⚡</span><span>Fast</span></button>
       </div>
     </footer>
+  </section>
+
+  <!-- Extra games: Bubble Pop and Build It (they check themselves) -->
+  <section id="game-screen" class="screen" hidden>
+    <header class="topbar">
+      <button id="game-quit" class="icon-btn small" aria-label="Stop"><span class="glyph" data-icon="ui-close">✕</span></button>
+      <div id="game-dots" class="game-dots" aria-hidden="true"></div>
+      <div id="game-mascot" class="mascot small idle">🦄</div>
+    </header>
+    <div id="pop-area" class="pop-area" hidden></div>
+    <div id="build-area" class="build-area" hidden>
+      <div id="build-slots" class="build-slots"></div>
+      <div id="build-tiles" class="build-tiles"></div>
+    </div>
+    <div id="game-burst" class="burst" aria-hidden="true"></div>
+    <button id="game-hear" class="big-btn hear"><span class="glyph" data-icon="ui-speaker">🔊</span> Hear it</button>
   </section>
 
   <!-- End of a session -->
