@@ -20,6 +20,7 @@ export function defaultState() {
       wakeLock: true,
       voiceVolume: 0.9,
       effects: true,
+      music: true,
       sessionLength: 'normal',
     },
   };

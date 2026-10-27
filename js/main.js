@@ -4,6 +4,7 @@ import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unma
 import { LISTS, listById, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
+import * as music from './music.js';
 import { wordId, sentenceId, cheerId, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
 import * as device from './device.js';
 import { art } from './art.js';
@@ -101,6 +102,7 @@ function mathCheck(text) {
 $('start').addEventListener('click', async () => {
   audio.unlock();
   audio.configure(state.settings);
+  music.setEnabled(state.settings.music);
   if (state.settings.fullscreen) await device.enterFullscreen();
   $('start-gate').hidden = true;
   go(state.setupDone ? 'home' : 'setup');
@@ -127,7 +129,7 @@ function renderHome() {
       hatched++;
       b.innerHTML = creatureFor(e.word);
       b.setAttribute('aria-label', show(e.word));
-      b.addEventListener('click', () => { audio.say(wordId(e.word), e.word); b.classList.remove('cheer'); void b.offsetWidth; });
+      b.addEventListener('click', () => { audio.chime.squeak(); audio.say(wordId(e.word), e.word); });
     } else {
       const stage = lvl >= 3 ? 3 : lvl >= 2 ? 2 : lvl >= 1 ? 1 : 0;
       b.innerHTML = eggFor(stage);
@@ -140,8 +142,8 @@ function renderHome() {
   $('sticker-count').textContent = state.stickers.length;
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
 }
-$('page-prev').addEventListener('click', () => { page--; renderHome(); });
-$('page-next').addEventListener('click', () => { page++; renderHome(); });
+$('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
+$('page-next').addEventListener('click', () => { audio.chime.whoosh(); page++; renderHome(); });
 $('fs-again').addEventListener('click', async () => { await device.enterFullscreen(); renderHome(); });
 device.onFullscreenChange(() => { if (!$('home').hidden) renderHome(); if (!$('settings-screen').hidden) renderSettings(); });
 $('stickers-btn').addEventListener('click', () => go('stickers'));
@@ -235,6 +237,7 @@ function showCard() {
   $('card').classList.remove('teach');
   $('card').classList.remove('pop'); void $('card').offsetWidth; $('card').classList.add('pop');
   setMascot($('play-mascot'), 'think');
+  audio.chime.pop();
   $('btn-hint').disabled = mode === 'meet';
   if (mode === 'learn') {
     // A brand-new word (level 0) gets the full Learning help.
@@ -252,6 +255,7 @@ function showHint(kind, faint = false) {
     const f = $('word').querySelector('.first');
     f.classList.add('sparkle');
     f.classList.toggle('faint', faint);
+    if (!faint) audio.chime.twinkle();
   } else if (kind === 'sentence') {
     renderSentence(card.word);
   }
@@ -353,8 +357,14 @@ async function teach(word) {
   $('teach-next').hidden = false;
   busy = false;
   const t = pick(NOT_YET);
+  // The word on its own, then in its sentence (owner, 2026-10-26). Stops if the parent moves on.
+  const still = () => card?.word === word && !$('teach-next').hidden;
+  const pause = ms => new Promise(r => setTimeout(r, ms));
   await audio.say(cheerId(t), t);
-  if (card?.word === word && !$('teach-next').hidden) await audio.say(wordId(word), word);
+  if (still()) await audio.say(wordId(word), word);
+  if (still()) await pause(450);
+  const entry = wordEntry(word);
+  if (still() && entry) await audio.say(sentenceId(word), entry.sentence);
 }
 $('next').addEventListener('click', () => { audio.stop(); showCard(); });
 
@@ -419,7 +429,7 @@ function endSession() {
     : '';
   go('end');
   setMascot($('end-mascot'), 'cheer');
-  audio.chime.hatch();
+  sessionStats.hatched.length ? audio.chime.hatch() : audio.chime.sticker();
   audio.say(sessionStats.hatched.length ? 'hatched' : 'sticker', sessionStats.hatched.length ? 'A new friend hatched!' : 'You earned a sticker!');
 }
 $('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
@@ -479,6 +489,7 @@ function renderSettings() {
     : 'Not available at this address (needs https). The screen may dim during a game.';
   $('set-volume').value = s.voiceVolume;
   $('set-effects').checked = s.effects;
+  $('set-music').checked = s.music;
   document.querySelectorAll('#set-length button').forEach(b => b.classList.toggle('on', b.dataset.len === s.sessionLength));
   const lists = $('set-lists');
   lists.innerHTML = '';
@@ -508,6 +519,7 @@ $('set-fullscreen').addEventListener('change', async e => {
 $('set-wake').addEventListener('change', e => { state.settings.wakeLock = e.target.checked; persist(); });
 $('set-volume').addEventListener('input', e => { state.settings.voiceVolume = Number(e.target.value); audio.configure(state.settings); persist(); });
 $('set-volume').addEventListener('change', () => audio.say('word-the', 'the'));
+$('set-music').addEventListener('change', e => { state.settings.music = e.target.checked; persist(); audio.unlock(); music.setEnabled(e.target.checked); });
 $('set-effects').addEventListener('change', e => { state.settings.effects = e.target.checked; audio.configure(state.settings); persist(); audio.chime.correct(); });
 document.querySelectorAll('#set-length button').forEach(b => b.addEventListener('click', () => { state.settings.sessionLength = b.dataset.len; persist(); renderSettings(); }));
 $('start-meet').addEventListener('click', () => { audio.unlock(); startSession('meet'); });
@@ -579,6 +591,7 @@ function renderProgress() {
 // ---------------------------------------------------------------- boot
 
 audio.configure(state.settings);
+audio.onVoice(on => music.duck(on));
 for (const s of SCREENS) $(s).hidden = true;
 document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
 if (art('meadow-bg')) document.body.classList.add('has-meadow');

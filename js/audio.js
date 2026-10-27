@@ -18,6 +18,33 @@ export function unlock() {
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
   } catch { /* no Web Audio: chimes stay silent */ }
+  warmSpeech();
+}
+
+export const audioContext = () => ctx;
+
+// Called with true when a voice line starts and false when it ends (the music dips under it).
+let voiceHook = null;
+export function onVoice(fn) { voiceHook = fn; }
+
+// Android's speech engine starts cold (seconds of silence on the first line), so wake it on
+// the first tap with a silent utterance, and pick an English voice once the list loads.
+let warmed = false;
+let lastCancel = 0;
+let voice = null;
+function pickVoice() {
+  const voices = speechSynthesis.getVoices();
+  voice = voices.find(v => /en[-_]US/i.test(v.lang) && /google/i.test(v.name))
+    || voices.find(v => /en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || null;
+}
+function warmSpeech() {
+  if (warmed || !('speechSynthesis' in window)) return;
+  warmed = true;
+  pickVoice();
+  speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  speechSynthesis.speak(u);
 }
 
 export function hasClip(id) {
@@ -36,7 +63,7 @@ export function preload(ids) {
 export function stop() {
   if (!current) return;
   if (current.audio) { current.audio.pause(); current.audio.currentTime = 0; }
-  if (current.utterance && 'speechSynthesis' in window) speechSynthesis.cancel();
+  if (current.utterance && 'speechSynthesis' in window) { speechSynthesis.cancel(); lastCancel = performance.now(); }
   current.resolve?.();
   current = null;
 }
@@ -47,7 +74,8 @@ export function say(id, text) {
   stop();
   if (volume <= 0) return Promise.resolve();
   return new Promise(resolve => {
-    const done = () => { if (current?.resolve === done) current = null; resolve(); };
+    voiceHook?.(true);
+    const done = () => { if (current?.resolve === done) { current = null; voiceHook?.(false); } resolve(); };
     const file = VOICE_CLIPS[id];
     if (file) {
       const audio = cache.get(id) || new Audio(`assets/voice/${file}`);
@@ -66,16 +94,22 @@ export function say(id, text) {
 
 function speak(text, done) {
   if (!('speechSynthesis' in window) || !text) { done(); return; }
-  speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
+  if (voice) u.voice = voice;
   u.rate = 0.85;
   u.pitch = 1.1;
   u.volume = volume;
   u.onend = done;
   u.onerror = done;
   current = { utterance: u, resolve: done };
-  speechSynthesis.speak(u);
+  // Chrome on Android drops an utterance queued in the same tick as cancel(), and a paused
+  // engine stays silent until resumed. Cancel only when something is playing, then wait a beat.
+  const busy = speechSynthesis.speaking || speechSynthesis.pending;
+  if (busy) { speechSynthesis.cancel(); lastCancel = performance.now(); }
+  speechSynthesis.resume();
+  const wait = performance.now() - lastCancel < 150 ? 120 : 0;
+  setTimeout(() => { if (current?.utterance === u) speechSynthesis.speak(u); }, wait);
   setTimeout(done, 6000); // some Android voices never fire onend
 }
 
@@ -96,6 +130,22 @@ function tone(freq, start, dur, type = 'sine', gain = 0.18) {
   o.stop(t + dur + 0.05);
 }
 
+function sweep(from, to, start, dur, gain = 0.08, type = 'sine') {
+  if (!effects || !ctx) return;
+  const t = ctx.currentTime + start;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(from, t);
+  o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.05);
+  o.connect(g).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + dur + 0.1);
+}
+
 export const chime = {
   correct() { tone(784, 0, 0.25); tone(1047, 0.1, 0.35); },
   fast() { tone(784, 0, 0.2); tone(988, 0.08, 0.2); tone(1319, 0.16, 0.4); },
@@ -103,4 +153,12 @@ export const chime = {
   rainbow() { [523, 659, 784, 988, 1047, 1319, 1568].forEach((f, i) => tone(f, i * 0.07, 0.35, 'sine', 0.12)); },
   hatch() { [659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.12, 0.5, 'triangle', 0.12)); },
   tap() { tone(1200, 0, 0.06, 'sine', 0.05); },
+  // A new card: a soft rising pop.
+  pop() { sweep(330, 660, 0, 0.12, 0.09); },
+  // The first-letter hint: a tiny twinkle.
+  twinkle() { [1568, 2093, 2637].forEach((f, i) => tone(f, i * 0.06, 0.25, 'sine', 0.05)); },
+  // Tapping a creature in the meadow.
+  squeak() { sweep(700, 1100, 0, 0.09, 0.08); sweep(900, 1300, 0.11, 0.08, 0.06); },
+  sticker() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, i * 0.09, 0.4, 'triangle', 0.1)); tone(2093, 0.4, 0.6, 'sine', 0.07); },
+  whoosh() { sweep(900, 300, 0, 0.18, 0.04, 'triangle'); },
 };
