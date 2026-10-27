@@ -49,6 +49,10 @@
         </div>
       </div>
       <div id="burst" class="burst" aria-hidden="true"></div>
+      <div id="egg-pop" class="egg-pop" hidden aria-hidden="true">
+        <div id="egg-pop-pic" class="egg-pop-pic"></div>
+        <div id="egg-dots" class="egg-dots"></div>
+      </div>
     </div>
     <div id="teach-next" class="teach-next" hidden>
       <button id="next" class="big-btn">Next ➜</button>
@@ -144,6 +148,20 @@
     <div id="progress-grid" class="progress-grid"></div>
     <p class="note">Tap a word to reset it.</p>
   </section>
+
+  <!-- A word reaches Known: its egg hatches -->
+  <div id="hatch" class="hatch" hidden>
+    <div class="hatch-rays" aria-hidden="true"></div>
+    <div class="hatch-stage">
+      <div id="hatch-egg" class="hatch-egg"></div>
+      <div id="hatch-friend" class="hatch-friend"></div>
+      <div class="hatch-flash" aria-hidden="true"></div>
+    </div>
+    <div id="hatch-burst" class="burst" aria-hidden="true"></div>
+    <p class="hatch-title">A new friend!</p>
+    <p id="hatch-word" class="hatch-word"></p>
+    <button id="hatch-done" class="big-btn" hidden>Yay! ➜</button>
+  </div>
 
   <!-- In-app confirm (never a browser pop-up) -->
   <div id="confirm" class="confirm" hidden>

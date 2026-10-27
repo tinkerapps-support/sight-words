@@ -323,11 +323,13 @@ function answer(result) {
   if (undoStack.length > 5) undoStack.shift();
 
   let hatchedNow = false;
+  let change = null;
   if (mode === 'meet') {
     applyPlacement(rec, result, Date.now(), sessionStats.levelOnes);
     if (rec.level === 1 && result === 'notyet') sessionStats.levelOnes++;
   } else {
     const res = applyResult(rec, result, { hinted, ms, now: Date.now() });
+    change = { word, before: res.before, after: res.after };
     if (res.hatched && !state.hatched.includes(word)) {
       state.hatched.push(word);
       sessionStats.hatched.push(word);
@@ -343,11 +345,88 @@ function answer(result) {
   } else {
     sessionStats.correct++;
     if (result === 'fast' && !hinted) sessionStats.fast++;
-    celebrate(result === 'fast' && !hinted, hatchedNow);
+    celebrate(result === 'fast' && !hinted, hatchedNow, change);
   }
 }
 
-function celebrate(fast, hatchedNow) {
+// ---------------------------------------------------------------- egg progress + hatching
+
+// Egg look by level (same as the meadow): plain → spotted → cracked → hatching.
+const eggStage = lvl => (lvl >= 3 ? 3 : lvl >= 2 ? 2 : lvl >= 1 ? 1 : 0);
+
+// After a correct card: the word's egg pops up with its progress dots (4 to hatch).
+// A level gained shows the old egg turning into the new one. Hatched words show their creature.
+function eggPop({ word, before, after, hatching = false }) {
+  const pop = $('egg-pop');
+  const pic = $('egg-pop-pic');
+  const dots = $('egg-dots');
+  const hatched = state.hatched.includes(word) && !hatching;
+  const up = after > before;
+  pic.className = 'egg-pop-pic';
+  if (hatched) {
+    pic.innerHTML = creatureFor(word);
+    pic.classList.add('friend-bounce');
+    if (after >= 5) pic.classList.add('crowned');
+  } else {
+    pic.innerHTML = eggFor(eggStage(up ? before : after));
+    pic.classList.add('wobble' + Math.max(1, eggStage(after)));
+  }
+  const filled = Math.min(after, 4);
+  dots.innerHTML = Array.from({ length: 4 }, (_, i) =>
+    `<i class="${i < filled ? 'on' : ''}${up && i === filled - 1 && !hatched ? ' new' : ''}"></i>`).join('');
+  dots.hidden = hatched;
+  pop.hidden = false;
+  pop.classList.remove('show'); void pop.offsetWidth; pop.classList.add('show');
+  if (up && !hatched) {
+    setTimeout(() => {
+      pic.innerHTML = eggFor(eggStage(after));
+      pic.classList.add('grow');
+      audio.chime.twinkle();
+    }, 420);
+  }
+  return up ? 1500 : 1150;
+}
+
+function hideEggPop() {
+  $('egg-pop').hidden = true;
+}
+
+// The big moment: the egg shakes, cracks open with a flash, and the creature bounces out.
+function hatchShow(word) {
+  return new Promise(resolve => {
+    const h = $('hatch');
+    const egg = $('hatch-egg');
+    const friend = $('hatch-friend');
+    egg.innerHTML = eggFor(3);
+    friend.innerHTML = creatureFor(word);
+    $('hatch-word').textContent = show(word);
+    $('hatch-done').hidden = true;
+    h.className = 'hatch';
+    h.hidden = false;
+    music.duck(true);
+    audio.chime.drumroll();
+    void h.offsetWidth;
+    h.classList.add('shaking');
+    setTimeout(() => {
+      h.classList.add('open');
+      audio.chime.fanfare();
+      burst(['✨', '💖', '⭐', '🌈', '🎉'], 26, $('hatch-burst'));
+    }, 1700);
+    setTimeout(async () => {
+      $('hatch-done').hidden = false;
+      await audio.say('hatched', 'A new friend hatched!');
+      if (!h.hidden) audio.say(wordId(word), word);
+    }, 2300);
+    $('hatch-done').onclick = () => {
+      audio.stop();
+      music.duck(false);
+      h.hidden = true;
+      resolve();
+    };
+  });
+}
+
+function celebrate(fast, hatchedNow, change) {
   setMascot($('play-mascot'), 'cheer');
   fast ? audio.chime.fast() : audio.chime.correct();
   burst(fast ? ['⚡', '⭐', '✨'] : ['⭐', '💖', '✨']);
@@ -357,11 +436,18 @@ function celebrate(fast, hatchedNow) {
   persist();
   renderMeter(full);
   if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); }
-  if (hatchedNow) audio.chime.hatch();
-  // A voice cheer now and then, not on every card.
-  if (full) audio.say('rainbow-full', 'A whole rainbow!');
-  else if (Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); audio.say(cheerId(t), t); }
-  setTimeout(() => { busy = false; if (full) renderMeter(); showCard(); }, full ? 1500 : 900);
+  // A voice cheer now and then, not on every card (never over a hatching).
+  if (full && !hatchedNow) audio.say('rainbow-full', 'A whole rainbow!');
+  else if (!hatchedNow && Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); audio.say(cheerId(t), t); }
+  const next = () => { hideEggPop(); busy = false; if (full) renderMeter(); showCard(); };
+  if (hatchedNow) {
+    // Show the cracked egg for a beat, then the hatching takes over the screen.
+    eggPop({ ...change, before: 3, after: 3, hatching: true });
+    setTimeout(() => { hideEggPop(); hatchShow(change.word).then(next); }, 900);
+    return;
+  }
+  const wait = change ? eggPop(change) : 900;
+  setTimeout(next, Math.max(wait, full ? 1500 : 0));
 }
 
 // Not yet: show the word with its sentence, say it, let her repeat, then the parent taps Next.
@@ -414,8 +500,8 @@ $('quit').addEventListener('click', async () => {
   go(mode === 'meet' ? 'settings' : 'home');
 });
 
-function burst(symbols, n = 10) {
-  const b = $('burst');
+function burst(symbols, n = 10, host = $('burst')) {
+  const b = host;
   for (let i = 0; i < n; i++) {
     const s = document.createElement('span');
     s.textContent = symbols[i % symbols.length];

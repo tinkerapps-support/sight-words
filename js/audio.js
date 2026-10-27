@@ -160,5 +160,14 @@ export const chime = {
   // Tapping a creature in the meadow.
   squeak() { sweep(700, 1100, 0, 0.09, 0.08); sweep(900, 1300, 0.11, 0.08, 0.06); },
   sticker() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, i * 0.09, 0.4, 'triangle', 0.1)); tone(2093, 0.4, 0.6, 'sine', 0.07); },
+  // Before a hatch: a soft rising drumroll of taps.
+  drumroll() { for (let i = 0; i < 16; i++) tone(180 + i * 12, i * 0.1, 0.07, 'triangle', 0.03 + i * 0.004); },
+  // The hatch: a bright little brass fanfare and a sparkle on top.
+  fanfare() {
+    const notes = [[523, 0, 0.16], [659, 0.15, 0.16], [784, 0.3, 0.16], [1047, 0.45, 0.7]];
+    for (const [f, t, d] of notes) { tone(f, t, d, 'sawtooth', 0.05); tone(f, t, d, 'triangle', 0.08); }
+    [523, 659, 784].forEach(f => tone(f, 0.45, 0.9, 'triangle', 0.06));
+    [1568, 2093, 2637, 3136].forEach((f, i) => tone(f, 0.6 + i * 0.07, 0.4, 'sine', 0.04));
+  },
   whoosh() { sweep(900, 300, 0, 0.18, 0.04, 'triangle'); },
 };

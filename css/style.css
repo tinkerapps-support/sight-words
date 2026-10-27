@@ -265,3 +265,70 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
   background: #fff; color: var(--ink); border-radius: 14px; padding: 8px 12px; font-size: 0.95rem;
   box-shadow: 0 4px 14px rgba(90,58,94,0.2); font-family: system-ui, sans-serif;
 }
+
+/* ---- Egg progress pop (after each correct card) ---- */
+.egg-pop {
+  position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: rgba(255,250,242,0.95); border-radius: 28px; padding: 14px 22px 12px;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--r6), 0 12px 26px rgba(90,58,94,0.22);
+  pointer-events: none;
+}
+.egg-pop.show { animation: egg-in 0.35s cubic-bezier(.34,1.56,.64,1); }
+@keyframes egg-in { from { transform: translateX(-50%) translateY(40px) scale(0.5); opacity: 0; } }
+.egg-pop-pic { width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; font-size: 4.5rem; position: relative; }
+.egg-pop-pic img { width: 100%; height: 100%; object-fit: contain; }
+.egg-pop-pic .egg { width: 60%; }
+.egg-pop-pic.wobble1 > * { animation: wobble 1.6s ease-in-out infinite; }
+.egg-pop-pic.wobble2 > * { animation: wobble 1.1s ease-in-out infinite; }
+.egg-pop-pic.wobble3 > * { animation: wobble 0.7s ease-in-out infinite; }
+.egg-pop-pic.grow > * { animation: egg-grow 0.5s ease-out; }
+@keyframes egg-grow { 0% { transform: scale(1); filter: brightness(1.6); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.egg-pop-pic.friend-bounce > * { animation: hop 0.5s ease-out 2; }
+.egg-pop-pic.crowned::after { content: '👑'; position: absolute; top: -14px; font-size: 1.6rem; }
+.egg-dots { display: flex; gap: 8px; }
+.egg-dots i { width: 16px; height: 16px; border-radius: 50%; background: #eadff0; box-shadow: inset 0 0 0 2px #fff; }
+.egg-dots i.on { background: var(--pink); }
+.egg-dots i.new { animation: dot-pop 0.6s ease-out 0.4s backwards; }
+@keyframes dot-pop { 0% { transform: scale(0); background: #fff; } 60% { transform: scale(1.6); } 100% { transform: scale(1); } }
+
+/* ---- Hatching celebration ---- */
+.hatch {
+  position: fixed; inset: 0; z-index: 40; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 24px; background: radial-gradient(circle at 50% 42%, #fff7d6 0%, #ffd6ea 45%, #e9dcff 100%);
+}
+.hatch-rays {
+  position: absolute; left: 50%; top: 42%; width: 220vmax; height: 220vmax; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(rgba(255,255,255,0.55) 0deg 10deg, transparent 10deg 24deg);
+  opacity: 0; transition: opacity 0.6s;
+}
+.hatch.open .hatch-rays { opacity: 1; animation: spin 14s linear infinite; }
+@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.hatch-stage { position: relative; width: min(70vw, 300px); aspect-ratio: 1; }
+.hatch-egg, .hatch-friend { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9rem; }
+.hatch-egg img, .hatch-friend img { width: 100%; height: 100%; object-fit: contain; }
+.hatch-egg .egg { width: 55%; }
+.hatch.shaking .hatch-egg { animation: shake-hard 1.7s ease-in forwards; }
+@keyframes shake-hard {
+  0% { transform: rotate(0); } 10% { transform: rotate(-4deg); } 20% { transform: rotate(4deg); }
+  30% { transform: rotate(-7deg); } 40% { transform: rotate(7deg); } 50% { transform: rotate(-10deg) scale(1.03); }
+  60% { transform: rotate(10deg) scale(1.05); } 70% { transform: rotate(-14deg) scale(1.07); }
+  80% { transform: rotate(14deg) scale(1.1); } 90% { transform: rotate(-16deg) scale(1.12); } 100% { transform: rotate(0) scale(1.15); }
+}
+.hatch.open .hatch-egg { animation: egg-pop-open 0.45s ease-in forwards; }
+@keyframes egg-pop-open { to { transform: scale(1.6); opacity: 0; filter: brightness(2); } }
+.hatch-friend { opacity: 0; transform: scale(0.2) translateY(30%); }
+.hatch.open .hatch-friend { animation: friend-out 0.8s cubic-bezier(.34,1.7,.64,1) 0.2s forwards, bob 2.4s ease-in-out 1.2s infinite; }
+@keyframes friend-out { to { opacity: 1; transform: scale(1) translateY(0); } }
+.hatch-flash { position: absolute; inset: -40%; border-radius: 50%; background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 65%); opacity: 0; pointer-events: none; }
+.hatch.open .hatch-flash { animation: flash 0.7s ease-out; }
+@keyframes flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+.hatch-title, .hatch-word { position: relative; margin: 0; opacity: 0; }
+.hatch-title { font-size: 2rem; font-weight: 700; color: var(--pink-deep); }
+.hatch-word { font-size: 4.5rem; font-weight: 700; color: var(--ink); line-height: 1; }
+.hatch.open .hatch-title { animation: appear 0.5s ease-out 0.6s forwards; }
+.hatch.open .hatch-word { animation: appear 0.5s ease-out 0.9s forwards; }
+.hatch .big-btn { position: relative; max-width: 360px; margin-top: 10px; animation: pop 0.4s ease-out; }
+.hatch .burst span { top: 40%; font-size: 2.2rem; }
+@keyframes appear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
