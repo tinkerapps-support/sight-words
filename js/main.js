@@ -1,6 +1,6 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
@@ -208,19 +208,20 @@ function startSession(kind) {
   mode = kind;
   const ents = entries();
   let queue, clash;
+  const pace = paceLevel(state.words, Date.now());
   if (kind === 'meet') {
     queue = ents.filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).map(e => e.word);
     if (!queue.length) { go('settings'); return; }
   } else {
     const built = buildSession({
       records: state.words, entries: ents, now: Date.now(),
-      length: CONFIG.sessionLength[state.settings.sessionLength] || CONFIG.sessionLength.normal,
+      length: CONFIG.sessionLength[state.settings.sessionLength] || CONFIG.sessionLength.normal, pace,
     });
     queue = built.queue;
     clash = built.clash;
   }
   session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 && cardKind(state.words[w], () => 1) === 'read' });
-  sessionStats = { cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
+  sessionStats = { pace, topUps: 0, cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
   renderMeter();
@@ -431,6 +432,7 @@ function answer(result) {
     const stepBefore = hatchProgress(rec, Date.now()).step;
     const res = applyResult(rec, result, { hinted, ms, now: Date.now() });
     change = { word, before: res.before, after: res.after, stepBefore };
+    if (res.before <= 2 && res.after >= 3) topUp();
     if (res.hatched && !state.hatched.includes(word)) {
       state.hatched.push(word);
       sessionStats.hatched.push(word);
@@ -452,6 +454,21 @@ function answer(result) {
     if (result === 'fast' && !hinted) sessionStats.fast++;
     celebrate(result === 'fast' && !hinted, hatchedNow, change);
   }
+}
+
+// When she's flying (pace 1–2) and a word graduates to Almost mid-game, a new word joins right away
+// instead of waiting for the next game. It replaces review cards that aren't due yet.
+function topUp() {
+  const P = CONFIG.pace.levels[sessionStats.pace] || CONFIG.pace.levels[0];
+  if (mode !== 'learn' || sessionStats.topUps >= P.topUps || session.remaining < 5) return;
+  const shaky = entries().filter(e => [1, 2].includes(levelOf(e.word))).length;
+  if (shaky >= P.maxShaky) return;
+  const word = nextFreshWord(state.words, entries(), new Set(session.queue));
+  if (!word) return;
+  const now = Date.now();
+  session.addWord(word, w => levelOf(w) >= 3 && (state.words[w]?.nextDue ?? 0) > now);
+  sessionStats.topUps++;
+  audio.preload([wordId(word), sentenceId(word)]);
 }
 
 // ---------------------------------------------------------------- egg progress + hatching
@@ -991,7 +1008,7 @@ function renderProgress() {
   const week = state.sessions.filter(s => s.t >= weekAgo);
   const known = ents.filter(e => levelOf(e.word) >= 4).length;
   $('progress-week').textContent = `This week: ${week.length} game${week.length === 1 ? '' : 's'}, ${week.reduce((n, s) => n + s.cards, 0)} cards. `
-    + `Known: ${known} of ${ents.length} words.`;
+    + `Known: ${known} of ${ents.length} words. New-word pace: ${PACE_NAMES[paceLevel(state.words, Date.now())]}.`;
   $('progress-ready').hidden = !(known / ents.length >= 0.8 && LISTS.some(l => !state.settings.lists.includes(l.id)));
   const grid = $('progress-grid');
   grid.innerHTML = '';

@@ -238,16 +238,46 @@ export function applyPlacement(rec, result, now, levelOneCount) {
   else if (result === 'notyet' && rec.level === 0 && levelOneCount < CONFIG.maxShaky) setLevel(rec, 1, now);
 }
 
+// ---- Pace: more new words when she's acing everything (owner, 2026-10-28) ----
+
+const GOOD = new Set(['fast', 'pop', 'build']);          // Fast read, first-try pop, first-try build
+const OK = new Set(['got', 'buildhelp']);
+const BAD = new Set(['notyet', 'popmiss']);
+
+// -1 slow, 0 normal, 1 quick, 2 fast, from her newest scored cards across every word.
+export function paceLevel(records, now) {
+  const P = CONFIG.pace;
+  const since = now - 14 * DAY;
+  const recent = Object.values(records).flatMap(r => r.history || [])
+    .filter(h => h.t >= since && (GOOD.has(h.r) || OK.has(h.r) || BAD.has(h.r)))
+    .sort((a, b) => b.t - a.t).slice(0, P.window);
+  if (recent.length < P.minCards) return 0;
+  const good = recent.filter(h => GOOD.has(h.r)).length / recent.length;
+  const right = recent.filter(h => !BAD.has(h.r)).length / recent.length;
+  if (right < P.slowBelow) return -1;
+  if (right >= P.fastAt && good >= P.fastStrong) return 2;
+  return right >= P.quickAt ? 1 : 0;
+}
+export const PACE_NAMES = { '-1': 'gentle (new words wait until current ones settle)', 0: 'normal', 1: 'quick (extra new words)', 2: 'fast (lots of new words)' };
+
+// The next brand-new word to bring in mid-game (list order), or null.
+export function nextFreshWord(records, entries, exclude = new Set()) {
+  const e = entries.find(x => (records[x.word]?.level ?? 0) === 0 && !(records[x.word]?.seen) && !exclude.has(x.word));
+  return e ? e.word : null;
+}
+
 // ---- Building a session (incremental rehearsal) ----
 
 // records: { [word]: record }, entries: activeWords(...). Returns { queue, targets, starterMode }.
 // The last card of `queue` is always the surest word available.
-export function buildSession({ records, entries, now, length, rng = Math.random }) {
+export function buildSession({ records, entries, now, length, rng = Math.random, pace = 0 }) {
+  const P = CONFIG.pace.levels[pace] || CONFIG.pace.levels[0];
   const rec = w => records[w] || newRecord();
   const level = w => rec(w).level;
   const words = entries.map(e => e.word);
   const known = words.filter(w => level(w) >= 3);
-  const starterMode = known.length < CONFIG.minKnownForFull;
+  // Starter mode keeps the first games small, unless she's already flying through them.
+  const starterMode = known.length < CONFIG.minKnownForFull && pace < 1;
   const isStarter = new Set(entries.filter(e => e.starter).map(e => e.word));
 
   const total = starterMode ? Math.min(length, CONFIG.starterSessionLength) : length;
@@ -258,11 +288,11 @@ export function buildSession({ records, entries, now, length, rng = Math.random 
   const allShaky = words.filter(w => level(w) === 1 || level(w) === 2);
   // A resting word still counts toward the shaky cap (so it isn't replaced by new words today).
   const shaky = allShaky.filter(w => !rested(w));
-  const maxShaky = starterMode ? CONFIG.starterMaxShaky : CONFIG.maxShaky;
+  const maxShaky = starterMode ? CONFIG.starterMaxShaky : P.maxShaky;
   const fresh = words.filter(w => level(w) === 0 && !(starterMode && isStarter.has(w)));
   for (let room = maxShaky - allShaky.length; room > 0 && fresh.length; room--) shaky.push(fresh.shift());
 
-  const nTargets = starterMode ? CONFIG.starterTargets : CONFIG.targetsPerSession;
+  const nTargets = starterMode ? CONFIG.starterTargets : P.targets;
   const targets = [...shaky]
     .sort((a, b) => rec(b).misses - rec(a).misses || rec(a).lastSeen - rec(b).lastSeen)
     .slice(0, nTargets);
@@ -428,6 +458,19 @@ export class Session {
       this.correctWords.add(word);
     }
     this.index++;
+  }
+
+  // A new word joins mid-game: it shows up 1, 3, 6 and 10 cards from now (intro, pops, reads),
+  // taking the place of filler cards where it can so the game stays about the same length.
+  // Never after the ending card.
+  addWord(word, isFiller = () => false) {
+    for (const off of [1, 3, 6, 10]) {
+      const end = this.queue.length - 1;
+      const pos = this.index + off;
+      if (pos >= end) { this.queue.splice(end, 0, word); break; }
+      if (isFiller(this.queue[pos]) && this.queue[pos] !== word) this.queue[pos] = word;
+      else this.queue.splice(pos, 0, word);
+    }
   }
 
   // The word rests: remove its later cards this game (never the ending card).

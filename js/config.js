@@ -16,6 +16,23 @@ export const CONFIG = {
   meterBands: 7,
   clozePauseMs: 1700,        // the pause where the word goes when a hint sentence is read
   historyCap: 60,
+  // Adaptive pace (owner, 2026-10-28): how fast new words come, from her recent scored cards.
+  pace: {
+    window: 24,              // newest scored cards looked at (last 14 days)
+    minCards: 12,            // fewer than this: normal pace
+    slowBelow: 0.7,          // share right below this: slow down
+    quickAt: 0.85,           // share right at or above this: a bit faster
+    fastAt: 0.92,            // …and this, with fastStrong of cards Fast / first try: fastest
+    fastStrong: 0.7,
+    // per pace (-1 slow, 0 normal, 1 quick, 2 fast): shaky-word cap, targets per game, and how
+    // many new words may join mid-game when a word graduates to Almost.
+    levels: {
+      '-1': { maxShaky: 2, targets: 1, topUps: 0 },
+      0: { maxShaky: 3, targets: 2, topUps: 0 },
+      1: { maxShaky: 4, targets: 2, topUps: 1 },
+      2: { maxShaky: 6, targets: 3, topUps: 2 },
+    },
+  },
   popsToLearn: 2,            // first-try Bubble Pops in a row: Learning → Getting it
   buildShareUnbuilt: 0.8,    // hatched word not yet built right: share of its cards that are Build It
   buildShareBuilt: 0.4,      // after it's built right once: Build It…
