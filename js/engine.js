@@ -165,6 +165,16 @@ export function cardKind(rec, rng = Math.random) {
   return r < CONFIG.buildShareBuilt + CONFIG.popShareBuilt ? 'pop' : 'read';
 }
 
+// How many bubbles a Bubble Pop card shows: 3 for a new word, one more once she's popped it
+// right on the first try, 5 once hatched, 6 once crowned.
+export function bubbleCount(rec) {
+  const B = CONFIG.bubbles;
+  if (!rec) return B.base;
+  if (rec.level >= 5) return B.crowned;
+  if (rec.level >= 4) return B.hatched;
+  return rec.popStreak >= 1 ? B.afterFirstTryPop : B.base;
+}
+
 function log(rec, entry) {
   rec.history.push(entry);
   if (rec.history.length > CONFIG.historyCap) rec.history.splice(0, rec.history.length - CONFIG.historyCap);

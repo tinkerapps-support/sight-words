@@ -24,13 +24,13 @@ export function clear() {
 // ---------------------------------------------------------------- Bubble Pop
 
 // Wrong choices come from the word's look-alikes, then any other word on the lists that are on.
-function distractors(word, entries, show) {
+function distractors(word, entries, show, n = 2) {
   const words = entries.map(e => e.word);
   const shown = new Set([show(word)]);
   const out = [];
   const like = shuffle([...lookalikesOf(word, entries)].filter(w => words.includes(w)));
   for (const w of [...like, ...shuffle(words)]) {
-    if (out.length >= 2) break;
+    if (out.length >= n) break;
     if (shown.has(show(w))) continue;
     shown.add(show(w));
     out.push(w);
@@ -38,18 +38,25 @@ function distractors(word, entries, show) {
   return out;
 }
 
-// Three spots, loosely a triangle, shuffled each card.
-const SPOTS = [[6, 8], [52, 20], [26, 52]];
+// Spots (left %, top %) by how many bubbles, loosely scattered; shuffled each card.
+const SPOTS = {
+  3: [[6, 8], [52, 20], [26, 52]],
+  4: [[4, 6], [52, 10], [8, 50], [54, 56]],
+  5: [[4, 4], [54, 6], [30, 32], [4, 60], [56, 62]],
+  6: [[2, 4], [36, 0], [68, 8], [4, 48], [38, 40], [68, 54]],
+};
 
 // Three bubbles bob in place (nothing is timed). A wrong bubble fades with "Try another one!";
 // onDone(firstTry) runs once she pops the right one.
-export function popCard({ word, entries, show, onWrong, onDone }) {
+export function popCard({ word, entries, show, count = 3, onWrong, onDone }) {
   const token = live = {};
   const area = $('pop-area');
   area.innerHTML = '';
   let firstTry = true;
-  const spots = shuffle(SPOTS);
-  shuffle([word, ...distractors(word, entries, show)]).forEach((w, i) => {
+  const choices = shuffle([word, ...distractors(word, entries, show, count - 1)]);
+  const spots = shuffle(SPOTS[choices.length] || SPOTS[3]);
+  area.dataset.n = String(choices.length);
+  choices.forEach((w, i) => {
     const b = document.createElement('button');
     b.className = 'bubble';
     b.textContent = show(w);

@@ -33,15 +33,18 @@ export const CONFIG = {
       2: { maxShaky: 6, targets: 3, topUps: 2 },
     },
   },
-  popsToLearn: 2,            // first-try Bubble Pops in a row: Learning → Getting it
+  popsToLearn: 2,
+  // Bubbles on a Bubble Pop card: more for a word she knows well (owner, 2026-10-28).
+  bubbles: { base: 3, afterFirstTryPop: 4, hatched: 5, crowned: 6 },            // first-try Bubble Pops in a row: Learning → Getting it
   buildShareUnbuilt: 0.8,    // hatched word not yet built right: share of its cards that are Build It
   buildShareBuilt: 0.4,      // after it's built right once: Build It…
   popShareBuilt: 0.2,        // …Bubble Pop for variety, and the rest (40%) reading
   // Automatic hints by level: when each one appears (ms after the card shows).
+  // Slowed down 2026-10-28 (owner: "a little too quickly"); was 0/3 s, 3/6 s, 6 s.
   hints: {
-    1: { sentence: 0, sparkle: 3000 },
-    2: { sparkle: 3000, sentence: 6000 },
-    3: { sparkle: 6000 },
+    1: { sparkle: 3000, sentence: 6000 },
+    2: { sparkle: 5000, sentence: 9000 },
+    3: { sparkle: 9000 },
   },
 };
 

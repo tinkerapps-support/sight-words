@@ -1,6 +1,6 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState } from './storage.js';
 import * as audio from './audio.js';
@@ -10,6 +10,7 @@ import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
 import { popCard, buildCard, clear as clearTask } from './games.js';
+import { showPets, stopPets, call as callPets, petState } from './pets.js';
 
 const $ = id => document.getElementById(id);
 // Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
@@ -63,6 +64,7 @@ const SCREENS = ['home', 'play-screen', 'guide-screen', 'end-screen', 'sticker-s
 function go(name) {
   const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
+  if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
   if (id === 'setup-screen') renderSetup();
   if (id === 'settings-screen') renderSettings();
@@ -133,16 +135,16 @@ function renderHome() {
   const m = $('meadow');
   m.innerHTML = '';
   let hatched = 0;
+  const friends = [];
   for (const e of list.words) {
     const lvl = levelOf(e.word);
     const isHatched = state.hatched.includes(e.word);
-    const b = document.createElement('button');
-    b.className = 'friend' + (isHatched ? ' hatched' : '') + (isHatched && lvl >= 5 ? ' mastered' : '');
+    // A hatched friend leaves its spot and roams the meadow (pets.js); the spot stays as grass.
+    const b = document.createElement(isHatched ? 'span' : 'button');
+    b.className = 'friend' + (isHatched ? ' spot' : '');
     if (isHatched) {
       hatched++;
-      b.innerHTML = creatureFor(e.word);
-      b.setAttribute('aria-label', show(e.word));
-      b.addEventListener('click', () => { audio.chime.squeak(); audio.say(wordId(e.word), e.word); });
+      friends.push(e.word);
     } else {
       const stage = lvl >= 3 ? 3 : lvl >= 2 ? 2 : lvl >= 1 ? 1 : 0;
       b.innerHTML = eggFor(stage);
@@ -153,9 +155,23 @@ function renderHome() {
     m.appendChild(b);
   }
   $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
+  // Wait a frame so the meadow has its size before friends are placed in it.
+  requestAnimationFrame(() => {
+    if ($('home').hidden) return;
+    showPets($('pet-layer'), friends, {
+      html: creatureFor,
+      crowned: w => levelOf(w) >= 5,
+      heart: () => (art('fx-heart') ? img(art('fx-heart')) : '💖'),
+    });
+  });
   $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
 }
+// A tap on the grass (not an egg or a friend) calls the friends over.
+$('meadow-wrap').addEventListener('click', e => {
+  if (e.target.closest('button.friend, .pet')) return;
+  callPets(e.clientX, e.clientY);
+});
 $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
 $('page-next').addEventListener('click', () => { audio.chime.whoosh(); page++; renderHome(); });
 $('fs-again').addEventListener('click', async () => { await device.enterFullscreen(); renderHome(); });
@@ -345,7 +361,7 @@ function showTask(c) {
   setMascot($('play-mascot'), 'think');
   audio.chime.pop();
   const onDone = firstTry => taskDone(c, firstTry);
-  if (kind === 'pop') popCard({ word, entries: entries(), show, onDone, onWrong: () => setMascot($('play-mascot'), 'gentle') });
+  if (kind === 'pop') popCard({ word, entries: entries(), show, count: bubbleCount(state.words[word]), onDone, onWrong: () => setMascot($('play-mascot'), 'gentle') });
   else buildCard({ word, show, onDone });
   // How-to once per game, then the word. Waits for the greeting instead of cutting it off.
   audio.idle().then(async () => {
@@ -1060,4 +1076,4 @@ if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9 }; // for the smoke test
+window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState }; // for the smoke test
