@@ -113,7 +113,7 @@ function finish() {
   run = null;
   const total = words.length;
   const st = ctx.state();
-  st.checks = [...(st.checks || []), { t: Date.now(), right, total, missed }].slice(-50);
+  st.checks = [...(st.checks || []), { t: Date.now(), right, total, missed, asked: words }].slice(-50);
   ctx.persist();
   $('check-bar').style.width = '100%';
   $('check-play').hidden = true;

@@ -160,7 +160,7 @@
           <button data-len="short">Short</button><button data-len="normal">Normal</button><button data-len="long">Long</button>
         </div>
       </div>
-      <button class="setting nav" data-go="progress">Progress <span>›</span></button>
+      <button class="setting nav" data-go="progress">Progress report <span>›</span></button>
       <button class="setting nav" id="start-meet">Meet the words (quick check) <span>›</span></button>
       <div class="setting col">
         <span>Backup</span>
@@ -210,7 +210,7 @@
       <p>Once every word has been introduced, a <b>Word Check</b> button appears under Play. It goes
         through every word once: ten words on the screen, the voice says one, and your child taps it.
         You get a score at the end and a list of words to practice. It's just a check, so it never
-        changes a word's progress, and the latest result is shown in Settings → Progress.</p>
+        changes a word's progress, and the latest result is shown in Settings → Progress report.</p>
 
       <h3>Playing a game</h3>
       <p>Sit together and tap <b>Play</b>. A word shows up, your child reads it out loud, and you tap
@@ -271,8 +271,17 @@
   </section>
 
   <section id="progress-screen" class="screen grown" hidden>
-    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Progress</h2><span class="spacer"></span></header>
-    <p id="progress-week" class="lead"></p>
+    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Progress report</h2><span class="spacer"></span></header>
+    <div class="report-controls">
+      <label>Word set <select id="report-list"></select></label>
+      <label>Sort <select id="report-sort">
+        <option value="stage">Needs help first</option>
+        <option value="stage-desc">Furthest along first</option>
+        <option value="accuracy">Lowest reading score first</option>
+        <option value="az">A to Z</option>
+      </select></label>
+    </div>
+    <div id="report-summary" class="report-summary"></div>
     <p id="progress-check" class="ready" hidden></p>
     <details class="how">
       <summary>How eggs hatch</summary>
@@ -290,8 +299,8 @@
         into its egg.</p>
     </details>
     <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
-    <div id="progress-grid" class="progress-grid"></div>
-    <p class="note">Tap a word to reset it.</p>
+    <div id="progress-grid" class="report-words"></div>
+    <p class="note">Card stats cover each word's last 60 cards. Tap a word to reset it.</p>
   </section>
 
   <!-- A word reaches Known: its egg hatches -->

@@ -12,6 +12,7 @@ import { art } from './art.js';
 import { popCard, buildCard, clear as clearTask } from './games.js';
 import { showPets, stopPets, call as callPets, petState } from './pets.js';
 import { initCheck, startCheck, checkReady, checkWord } from './check.js';
+import { wordStats, setSummary } from './report.js';
 
 const $ = id => document.getElementById(id);
 // Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
@@ -1025,44 +1026,86 @@ $('reset-all').addEventListener('click', async () => {
 
 // ---------------------------------------------------------------- grown-up: progress
 
+let reportList = null;   // which word set the report shows
+const shortDay = t => (t ? new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
+const pctText = v => (v === null ? '—' : `${v}%`);
+
 function renderProgress() {
-  const ents = entries();
-  const weekAgo = Date.now() - 7 * 864e5;
-  const week = state.sessions.filter(s => s.t >= weekAgo);
-  const known = ents.filter(e => levelOf(e.word) >= 4).length;
-  $('progress-week').textContent = `This week: ${week.length} game${week.length === 1 ? '' : 's'}, ${week.reduce((n, s) => n + s.cards, 0)} cards. `
-    + `Known: ${known} of ${ents.length} words. New-word pace: ${PACE_NAMES[paceLevel(state.words, Date.now())]}.`;
+  const now = Date.now();
+  // Word set picker: every list, the first one that's on by default.
+  const pickEl = $('report-list');
+  if (!reportList || !LISTS.some(l => l.id === reportList)) reportList = state.settings.lists[0] || LISTS[0].id;
+  pickEl.innerHTML = LISTS.map(l => `<option value="${l.id}"${l.id === reportList ? ' selected' : ''}>${l.name}${state.settings.lists.includes(l.id) ? '' : ' (off)'}</option>`).join('');
+  const list = LISTS.find(l => l.id === reportList);
+  const words = list.words.map(e => e.word);
+
+  // Summary: words at each stage (a bar), friends, reading this week, pace, Word Checks.
+  const sum = setSummary(state.words, words, now);
+  const week = state.sessions.filter(x => x.t >= now - 7 * 864e5);
+  const bar = sum.levels.map((n, lv) => (n ? `<i class="lv${lv}" style="flex:${n}" title="${LEVEL_NAMES[lv]}: ${n}"></i>` : '')).join('');
+  const legend = sum.levels.map((n, lv) => `<span><i class="lv${lv}"></i>${LEVEL_NAMES[lv]} ${n}</span>`).join('');
+  const checks = state.checks.filter(c => !c.asked || c.asked.some(w => words.includes(w))).slice(-5).reverse();
+  $('report-summary').innerHTML = `
+    <div class="stage-bar">${bar}</div>
+    <div class="stage-legend">${legend}</div>
+    <p><b>${sum.hatched}</b> of ${sum.total} hatched · <b>${sum.crowned}</b> crowned</p>
+    <p>This week: ${week.length} game${week.length === 1 ? '' : 's'}, ${week.reduce((n, x) => n + x.cards, 0)} cards · reading ${sum.weekReads ? `${sum.weekRight}% right, ${sum.weekFast}% fast` : '—'}</p>
+    <p>New-word pace: ${PACE_NAMES[paceLevel(state.words, now)]}</p>
+    ${checks.length ? `<p>Word Checks: ${checks.map(c => `${c.right}/${c.total} (${shortDay(c.t)})`).join(' · ')}</p>` : ''}`;
+
   const lastCheck = state.checks[state.checks.length - 1];
-  $('progress-check').hidden = !lastCheck;
-  if (lastCheck) {
-    const day = new Date(lastCheck.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    $('progress-check').textContent = `Last Word Check (${day}): ${lastCheck.right} of ${lastCheck.total}`
-      + (lastCheck.missed.length ? `. To practice: ${lastCheck.missed.map(show).join(', ')}.` : '. All right!');
-  }
+  $('progress-check').hidden = !lastCheck || !lastCheck.missed.length;
+  if (lastCheck) $('progress-check').textContent = `Last Word Check (${shortDay(lastCheck.t)}): practice ${lastCheck.missed.map(show).join(', ')}.`;
+  const ents = entries();
+  const known = ents.filter(e => levelOf(e.word) >= 4).length;
   $('progress-ready').hidden = !(known / ents.length >= 0.8 && LISTS.some(l => !state.settings.lists.includes(l.id)));
+
+  // One card per word.
+  const stats = Object.fromEntries(words.map(w => [w, wordStats(state.words[w], w, state.checks)]));
+  const sort = $('report-sort').value;
+  const lvl = w => levelOf(w);
+  const order = words.slice().sort({
+    stage: (a, b2) => lvl(a) - lvl(b2) || stats[b2].misses - stats[a].misses,
+    'stage-desc': (a, b2) => lvl(b2) - lvl(a) || stats[a].misses - stats[b2].misses,
+    accuracy: (a, b2) => (stats[a].readRight ?? 101) - (stats[b2].readRight ?? 101) || lvl(a) - lvl(b2),
+    az: (a, b2) => a.toLowerCase().localeCompare(b2.toLowerCase()),
+  }[sort] || (() => 0));
   const grid = $('progress-grid');
   grid.innerHTML = '';
-  const order = ents.slice().sort((a, b) => levelOf(a.word) - levelOf(b.word) || (state.words[b.word]?.misses ?? 0) - (state.words[a.word]?.misses ?? 0));
-  for (const e of order) {
-    const r = state.words[e.word] || newRecord();
-    const times = r.history.filter(h => h.r !== 'notyet').map(h => h.ms);
-    const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length / 1000).toFixed(1) + ' s' : '—';
-    const last = r.lastSeen ? new Date(r.lastSeen).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'never';
-    const b = document.createElement('button');
-    b.className = 'prog';
-    b.innerHTML = `<b>${show(e.word)}${r.headStart ? ' ⭐' : ''}</b><span class="lvl lv${r.level}">${LEVEL_NAMES[r.level]}</span><br>`
-      + `missed ${r.misses} · avg ${avg}<br>last seen ${last}`
-      + `<span class="next">${nextStep(state.words[e.word], Date.now())}</span>`;
-    b.addEventListener('click', async () => {
-      if (!(await mathCheck(`Reset "${show(e.word)}" to New?`))) return;
-      delete state.words[e.word];
-      state.hatched = state.hatched.filter(w => w !== e.word);
+  for (const w of order) {
+    const r = state.words[w];
+    const st = stats[w];
+    const level = r?.level ?? 0;
+    const card = document.createElement('button');
+    card.className = 'word-report';
+    const reading = st.reads ? `${st.reads} · ${pctText(st.readRight)} right · ${pctText(st.readFast)} fast${st.avgSec !== null ? ` · avg ${st.avgSec.toFixed(1)} s` : ''}` : 'not yet';
+    const pop = st.pops ? `${st.pops} · ${pctText(st.popFirst)} first try` : '—';
+    const build = level < 4 ? 'after hatching' : st.built ? `built ✓ (${st.builds} tr${st.builds === 1 ? 'y' : 'ies'})` : st.builds ? `not yet · ${st.builds} tr${st.builds === 1 ? 'y' : 'ies'}` : 'not tried yet';
+    const check = st.checks ? `${st.checkRight} of ${st.checks} right${st.lastCheckRight === false ? ' (missed last time)' : ''}` : '—';
+    card.innerHTML = `
+      <div class="wr-head"><b>${show(w)}</b>${r?.headStart ? ' <span class="wr-tag">head start</span>' : ''}<span class="lvl lv${level}">${LEVEL_NAMES[level]}</span><span class="egg-dots small"></span></div>
+      <div class="wr-next">${nextStep(r, now)}</div>
+      <dl>
+        <dt>Reading</dt><dd>${reading}</dd>
+        <dt>Bubble Pop</dt><dd>${pop}</dd>
+        <dt>Build It</dt><dd>${build}</dd>
+        <dt>Word Check</dt><dd>${check}</dd>
+        <dt>Seen</dt><dd>${st.seen} card${st.seen === 1 ? '' : 's'} · ${st.misses} miss${st.misses === 1 ? '' : 'es'} · ${st.days} day${st.days === 1 ? '' : 's'}</dd>
+        <dt>Dates</dt><dd>met ${shortDay(st.firstSeen)} · last ${shortDay(st.lastSeen)}</dd>
+      </dl>`;
+    renderDots(card.querySelector('.egg-dots'), hatchProgress(r, now));
+    card.addEventListener('click', async () => {
+      if (!(await mathCheck(`Reset "${show(w)}" to New?`))) return;
+      delete state.words[w];
+      state.hatched = state.hatched.filter(x => x !== w);
       persist();
       renderProgress();
     });
-    grid.appendChild(b);
+    grid.appendChild(card);
   }
 }
+$('report-list').addEventListener('change', e => { reportList = e.target.value; renderProgress(); });
+$('report-sort').addEventListener('change', () => renderProgress());
 
 // ---------------------------------------------------------------- boot
 
