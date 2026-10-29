@@ -33,6 +33,7 @@ export const CONFIG = {
       2: { maxShaky: 6, targets: 3, topUps: 2 },
     },
   },
+  check: { grid: 10 },       // Word Check: words on screen per question
   popsToLearn: 2,
   // Bubbles on a Bubble Pop card: more for a word she knows well (owner, 2026-10-28).
   bubbles: { base: 3, afterFirstTryPop: 4, hatched: 5, crowned: 6 },            // first-try Bubble Pops in a row: Learning → Getting it

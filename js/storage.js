@@ -14,6 +14,7 @@ export function defaultState() {
     meter: 0,
     stickers: [],     // one per finished session: { t, id }
     sessions: [],     // { t, cards, correct, fast }
+    checks: [],       // Word Check results: { t, right, total, missed }
     settings: {
       lists: [LISTS[0].id],
       fullscreen: false,
@@ -38,7 +39,7 @@ export function normalize(raw) {
     }
     state.words[w] = { ...newRecord(), ...rec, history: Array.isArray(rec.history) ? rec.history : [] };
   }
-  for (const k of ['hatched', 'stickers', 'sessions']) if (!Array.isArray(state[k])) state[k] = [];
+  for (const k of ['hatched', 'stickers', 'sessions', 'checks']) if (!Array.isArray(state[k])) state[k] = [];
   state.settings.lists = state.settings.lists.filter(id => LISTS.some(l => l.id === id));
   if (!state.settings.lists.length) state.settings.lists = [LISTS[0].id];
   return state;

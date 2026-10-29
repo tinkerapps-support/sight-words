@@ -34,6 +34,7 @@
     </div>
     <p id="meadow-count" class="meadow-count"></p>
     <button id="play" class="big-btn play">Play <span class="glyph" data-icon="ui-play">▶</span></button>
+    <button id="check-btn" class="mid-btn" hidden><span class="glyph" data-icon="ui-star">⭐</span> Word Check</button>
     <button id="stickers-btn" class="link-btn"><span class="glyph" data-icon="ui-star">⭐</span> <span id="sticker-count">0 stickers</span></button>
   </section>
 
@@ -85,6 +86,28 @@
         <button id="btn-fast" class="answer fast"><span class="glyph" data-icon="ui-fast">⚡</span><span>Fast</span></button>
       </div>
     </footer>
+  </section>
+
+  <!-- Word Check: every word once, 10 on screen, a score at the end -->
+  <section id="check-screen" class="screen" hidden>
+    <header class="topbar">
+      <button id="check-quit" class="icon-btn small" aria-label="Stop"><span class="glyph" data-icon="ui-close">✕</span></button>
+      <div class="check-progress"><div id="check-bar" class="check-bar"></div></div>
+      <span id="check-count" class="check-count"></span>
+      <div id="check-mascot" class="mascot small idle">🦄</div>
+    </header>
+    <div id="check-play" class="check-play">
+      <div id="check-grid" class="check-grid"></div>
+      <button id="check-hear" class="big-btn hear"><span class="glyph" data-icon="ui-speaker">🔊</span> Hear it</button>
+    </div>
+    <div id="check-result" class="end-box" hidden>
+      <div id="check-result-mascot" class="mascot cheer">🦄</div>
+      <h1 id="check-score"></h1>
+      <div id="check-stars" class="check-stars"></div>
+      <p id="check-missed" class="check-missed"></p>
+      <button id="check-done" class="big-btn">Done</button>
+    </div>
+    <div id="check-burst" class="burst" aria-hidden="true"></div>
   </section>
 
   <!-- End of a session -->
@@ -183,6 +206,12 @@
         more days later earns its <b>crown</b>.</p>
       <p><b>Tap any egg</b> in the meadow to see how close it is and what it needs next.</p>
 
+      <h3>Word Check</h3>
+      <p>Once every word has been introduced, a <b>Word Check</b> button appears under Play. It goes
+        through every word once: ten words on the screen, the voice says one, and your child taps it.
+        You get a score at the end and a list of words to practice. It's just a check, so it never
+        changes a word's progress, and the latest result is shown in Settings → Progress.</p>
+
       <h3>Playing a game</h3>
       <p>Sit together and tap <b>Play</b>. A word shows up, your child reads it out loud, and you tap
         one of the three buttons at the bottom:</p>
@@ -244,6 +273,7 @@
   <section id="progress-screen" class="screen grown" hidden>
     <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Progress</h2><span class="spacer"></span></header>
     <p id="progress-week" class="lead"></p>
+    <p id="progress-check" class="ready" hidden></p>
     <details class="how">
       <summary>How eggs hatch</summary>
       <p>An egg hatches when the word is read <b>Fast on two different days</b>. A Fast only counts

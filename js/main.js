@@ -11,6 +11,7 @@ import * as device from './device.js';
 import { art } from './art.js';
 import { popCard, buildCard, clear as clearTask } from './games.js';
 import { showPets, stopPets, call as callPets, petState } from './pets.js';
+import { initCheck, startCheck, checkReady, checkWord } from './check.js';
 
 const $ = id => document.getElementById(id);
 // Everything she reads is lowercase except the word "I" (owner, 2026-10-26). Data and voice keep normal case.
@@ -60,9 +61,9 @@ const levelOf = word => state.words[word]?.level ?? 0;
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+const SCREENS = ['home', 'play-screen', 'check-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', check: 'check-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
@@ -155,6 +156,7 @@ function renderHome() {
     m.appendChild(b);
   }
   $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
+  $('check-btn').hidden = !checkReady();
   // Wait a frame so the meadow has its size before friends are placed in it.
   requestAnimationFrame(() => {
     if ($('home').hidden) return;
@@ -171,6 +173,11 @@ function renderHome() {
 $('meadow-wrap').addEventListener('click', e => {
   if (e.target.closest('button.friend, .pet')) return;
   callPets(e.clientX, e.clientY);
+});
+$('check-btn').addEventListener('click', async () => {
+  audio.unlock();
+  if (state.settings.fullscreen) await device.enterFullscreen();
+  startCheck();
 });
 $('page-prev').addEventListener('click', () => { audio.chime.whoosh(); page--; renderHome(); });
 $('page-next').addEventListener('click', () => { audio.chime.whoosh(); page++; renderHome(); });
@@ -1025,6 +1032,13 @@ function renderProgress() {
   const known = ents.filter(e => levelOf(e.word) >= 4).length;
   $('progress-week').textContent = `This week: ${week.length} game${week.length === 1 ? '' : 's'}, ${week.reduce((n, s) => n + s.cards, 0)} cards. `
     + `Known: ${known} of ${ents.length} words. New-word pace: ${PACE_NAMES[paceLevel(state.words, Date.now())]}.`;
+  const lastCheck = state.checks[state.checks.length - 1];
+  $('progress-check').hidden = !lastCheck;
+  if (lastCheck) {
+    const day = new Date(lastCheck.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    $('progress-check').textContent = `Last Word Check (${day}): ${lastCheck.right} of ${lastCheck.total}`
+      + (lastCheck.missed.length ? `. To practice: ${lastCheck.missed.map(show).join(', ')}.` : '. All right!');
+  }
   $('progress-ready').hidden = !(known / ents.length >= 0.8 && LISTS.some(l => !state.settings.lists.includes(l.id)));
   const grid = $('progress-grid');
   grid.innerHTML = '';
@@ -1076,4 +1090,5 @@ if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState }; // for the smoke test
+initCheck({ state: () => state, persist, go, show, entries, setMascot, burst });
+window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test

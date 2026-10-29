@@ -514,3 +514,31 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .pop-area[data-n="4"] { --bsize: min(36vw, 150px); }
 .pop-area[data-n="5"] { --bsize: min(32vw, 136px); }
 .pop-area[data-n="6"] { --bsize: min(29vw, 122px); }
+
+/* ---- Word Check (check.js) ---- */
+.mid-btn {
+  align-self: center; padding: 10px 26px; border-radius: 999px;
+  font-size: 1.2rem; font-weight: 700; color: var(--pink-deep);
+  background: rgba(255,255,255,0.9); box-shadow: 0 4px 0 #e7b7cf, 0 6px 12px rgba(184,62,124,0.15);
+}
+.mid-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #e7b7cf; }
+#check-screen { gap: 10px; }
+.check-progress { flex: 1; height: 12px; border-radius: 999px; background: rgba(255,255,255,0.7); overflow: hidden; }
+.check-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--pink), var(--pink-deep)); transition: width 0.4s; }
+.check-count { font-weight: 700; color: var(--ink-soft); min-width: 3.5em; text-align: center; }
+.check-play { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.check-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; }
+.check-word {
+  border-radius: 18px; background: #fff; color: var(--ink);
+  font-size: clamp(1.8rem, 9vw, 2.6rem); font-weight: 700;
+  box-shadow: 0 4px 0 #e7b7cf, 0 6px 12px rgba(90,58,94,0.08);
+}
+.check-word:active { transform: translateY(2px); }
+.check-word:disabled { opacity: 1; }
+.check-word.right { background: #d9f4e6; color: #2f7a55; animation: pop 0.3s ease-out; }
+.check-word.wrong { opacity: 0.45; animation: nudge 0.45s; }
+.check-word.reveal { background: var(--pink-soft); color: var(--pink-deep); box-shadow: 0 0 0 4px var(--pink); }
+.check-stars { font-size: 2.6rem; letter-spacing: 6px; }
+.check-missed { font-family: system-ui, sans-serif; color: var(--ink-soft); line-height: 1.5; text-align: center; }
+.check-missed span { display: inline-block; margin: 2px 4px; padding: 0 8px; border-radius: 8px; background: #fff; font-family: 'Andika', sans-serif; font-size: 1.2rem; color: var(--ink); }
+#check-result { margin: auto 0; }
