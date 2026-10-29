@@ -2,7 +2,8 @@
 import { CONFIG, LEVEL_NAMES } from './config.js';
 import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
-import { load, save, record, exportText, importText, defaultState } from './storage.js';
+import { load, save, record, exportText, importText, defaultState, mergeStates } from './storage.js';
+import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid } from './sync.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
 import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
@@ -68,6 +69,7 @@ function go(name) {
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
+  if (id === 'home' || id === 'settings-screen') doSync();
   if (id === 'setup-screen') renderSetup();
   if (id === 'settings-screen') renderSettings();
   if (id === 'progress-screen') renderProgress();
@@ -113,6 +115,81 @@ function mathCheck(text) {
     $('confirm-no').onclick = () => finish(false);
   });
 }
+
+// Typing in a sync code from another device.
+function codeEntry() {
+  return new Promise(resolve => {
+    $('confirm-text').textContent = 'Enter the sync code from the other device. Progress on this device will be combined with it (nothing is lost).';
+    $('code-input').value = '';
+    $('code-wrong').hidden = true;
+    $('code-entry').hidden = false;
+    $('confirm').hidden = false;
+    $('code-input').focus();
+    const finish = v => {
+      $('confirm').hidden = true;
+      $('code-entry').hidden = true;
+      $('confirm-yes').onclick = $('confirm-no').onclick = $('code-input').onkeydown = null;
+      resolve(v);
+    };
+    const check = () => {
+      const code = normalizeCode($('code-input').value);
+      if (codeLooksValid(code)) finish(code); else $('code-wrong').hidden = false;
+    };
+    $('confirm-yes').onclick = check;
+    $('code-input').onkeydown = e => { if (e.key === 'Enter') check(); };
+    $('confirm-no').onclick = () => finish(null);
+  });
+}
+
+// ---------------------------------------------------------------- sync between devices
+
+// Never while a game or Word Check is running (their screens hold the state they started with).
+const playing = () => Boolean(session) || !$('play-screen').hidden || !$('check-screen').hidden;
+let lastSyncTry = 0;
+async function doSync(force = false) {
+  if (!syncInfo().code || playing()) return;
+  if (!force && Date.now() - lastSyncTry < 4000) return;
+  lastSyncTry = Date.now();
+  renderSyncBox('Syncing…');
+  try {
+    const merged = await syncNow(state);
+    // Merge again with this device's current state, so taps made while syncing aren't lost.
+    if (merged && !playing()) {
+      const { settings, ...shared } = merged;
+      state = mergeStates(state, shared);
+      persist();
+      if (!$('home').hidden) renderHome();
+      if (!$('progress-screen').hidden) renderProgress();
+      if (!$('sticker-screen').hidden) renderStickers();
+    }
+  } catch { /* the status line shows the error; it retries next time */ }
+  renderSyncBox();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') doSync(); });
+
+function renderSyncBox(status) {
+  const info = syncInfo();
+  $('sync-off').hidden = Boolean(info.code);
+  $('sync-on').hidden = !info.code;
+  if (!info.code) return;
+  $('sync-code').textContent = info.code;
+  const when = info.lastSync ? new Date(info.lastSync).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet';
+  $('sync-status').textContent = status || (info.lastError ? `Couldn't sync (${info.lastError}). It will try again. Last synced: ${when}.` : `Last synced: ${when}.`);
+}
+$('sync-create').addEventListener('click', () => { setCode(newCode()); doSync(true); renderSyncBox(); });
+$('sync-enter').addEventListener('click', async () => {
+  const code = await codeEntry();
+  if (!code) return;
+  setCode(code);
+  renderSyncBox();
+  await doSync(true);
+});
+$('sync-now').addEventListener('click', () => doSync(true));
+$('sync-stop').addEventListener('click', async () => {
+  if (!(await confirmBox('Stop syncing on this device? Its progress stays here; the other devices keep syncing.'))) return;
+  clearCode();
+  renderSyncBox();
+});
 
 // ---------------------------------------------------------------- start
 
@@ -973,6 +1050,7 @@ function renderSettings() {
     fetch('version.json', { cache: 'no-store' }).then(r => r.json())
       .then(v => { $('version').textContent = `Version ${v.version} · updated ${v.built} · ${voiceNote()}`; }).catch(() => {});
   } else $('version').textContent = `Version: local copy · ${voiceNote()}`;
+  renderSyncBox();
   const meetLeft = entries().filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).length;
   $('start-meet').disabled = meetLeft === 0;
 }
@@ -1019,7 +1097,7 @@ $('import-file').addEventListener('change', async e => {
 $('reset-all').addEventListener('click', async () => {
   if (!(await mathCheck('Erase all progress, friends and stickers? This can\'t be undone (unless you saved a backup).'))) return;
   const settings = state.settings;
-  state = { ...defaultState(), settings };
+  state = { ...defaultState(), settings, resetAll: Date.now() };
   persist();
   go('setup');
 });
@@ -1098,6 +1176,7 @@ function renderProgress() {
       if (!(await mathCheck(`Reset "${show(w)}" to New?`))) return;
       delete state.words[w];
       state.hatched = state.hatched.filter(x => x !== w);
+      state.resets = { ...state.resets, [w]: Date.now() };
       persist();
       renderProgress();
     });
@@ -1134,4 +1213,5 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.hostname 
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 initCheck({ state: () => state, persist, go, show, entries, setMascot, burst });
+doSync(true);
 window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test

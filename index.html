@@ -171,12 +171,34 @@
         </div>
       </div>
       <div class="setting col">
+        <span>Sync between devices</span>
+        <div id="sync-off">
+          <span class="note">Keep the same progress on more than one phone or tablet. Create a code here, then
+            enter it on the other device.</span>
+          <div class="row-btns">
+            <button id="sync-create" class="small-btn">Create a sync code</button>
+            <button id="sync-enter" class="small-btn">Enter a code</button>
+          </div>
+        </div>
+        <div id="sync-on" hidden>
+          <span class="note">Sync code (enter it on the other device; keep it private):</span>
+          <code id="sync-code" class="sync-code"></code>
+          <span id="sync-status" class="note"></span>
+          <div class="row-btns">
+            <button id="sync-now" class="small-btn">Sync now</button>
+            <button id="sync-stop" class="small-btn">Stop syncing here</button>
+          </div>
+        </div>
+      </div>
+      <div class="setting col">
         <span>Reset progress</span>
         <span class="note">Erases every word's progress, friends and stickers. Settings are kept.</span>
         <button id="reset-all" class="small-btn danger">Reset progress</button>
       </div>
       <p class="note about">Voices are AI-generated (OpenAI text-to-speech). When a voice clip is missing, the
-        phone's own voice is used. Everything is saved only on this phone; nothing is sent anywhere.</p>
+        phone's own voice is used. Progress is saved on this phone. If you turn on Sync, it's also kept in a private online
+        database (Google Firebase) under your sync code, so other devices with the code can share it. No names
+        are stored, and nothing else is sent anywhere.</p>
       <p class="note" id="version"></p>
     </div>
   </section>
@@ -266,7 +288,8 @@
       <p>Press and hold the ⚙ gear for three seconds (so little fingers don't open it by accident).
         There you can mark words your child already knows (<b>Head start</b>), change the game
         length, turn music and sounds on or off, see <b>Progress</b>, and save a <b>backup</b>.
-        Everything is saved only on this phone, so a backup now and then is a good idea.</p>
+        Progress lives on this phone, so either save a <b>backup</b> now and then or turn on <b>Sync</b>:
+        create a sync code, enter it on another phone or tablet, and both keep the same progress.</p>
     </div>
   </section>
 
@@ -337,6 +360,11 @@
   <div id="confirm" class="confirm" hidden>
     <div class="confirm-box">
       <p id="confirm-text"></p>
+      <div id="code-entry" class="math" hidden>
+        <label for="code-input">Sync code</label>
+        <input id="code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="PINK-OTTER-MOON-STAR-7Q2K">
+        <p id="code-wrong" class="math-wrong" hidden>That doesn't look like a sync code (5 parts, like the example).</p>
+      </div>
       <div id="math" class="math" hidden>
         <label for="math-answer" id="math-q"></label>
         <input id="math-answer" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done">

@@ -1,5 +1,6 @@
 // Saved progress (localStorage) plus backup export/import (PLAN.md §7, §9).
 import { newRecord } from './engine.js';
+import { CONFIG } from './config.js';
 import { LISTS } from './lists.js';
 
 const KEY = 'sightwords.v1';
@@ -14,7 +15,9 @@ export function defaultState() {
     meter: 0,
     stickers: [],     // one per finished session: { t, id }
     sessions: [],     // { t, cards, correct, fast }
-    checks: [],       // Word Check results: { t, right, total, missed }
+    checks: [],       // Word Check results: { t, right, total, missed, asked }
+    resets: {},       // word -> when the parent reset it (so sync doesn't bring old progress back)
+    resetAll: 0,      // when all progress was last reset
     settings: {
       lists: [LISTS[0].id],
       fullscreen: false,
@@ -40,6 +43,8 @@ export function normalize(raw) {
     state.words[w] = { ...newRecord(), ...rec, history: Array.isArray(rec.history) ? rec.history : [] };
   }
   for (const k of ['hatched', 'stickers', 'sessions', 'checks']) if (!Array.isArray(state[k])) state[k] = [];
+  if (!state.resets || typeof state.resets !== 'object') state.resets = {};
+  if (typeof state.resetAll !== 'number') state.resetAll = 0;
   state.settings.lists = state.settings.lists.filter(id => LISTS.some(l => l.id === id));
   if (!state.settings.lists.length) state.settings.lists = [LISTS[0].id];
   return state;
@@ -76,4 +81,51 @@ export function importText(text) {
 export function record(state, word) {
   if (!state.words[word]) state.words[word] = newRecord();
   return state.words[word];
+}
+
+// Sync (sync.js): combine this device's progress with the synced copy so nothing is lost.
+// Each word keeps the record that's further along (level, then cards seen, then most recent),
+// with the history of both. Stickers, games and Word Checks from both are kept. Anything older than
+// a reset (one word, or everything) is dropped. Settings and the rainbow meter stay per device.
+export function mergeStates(local, remoteRaw) {
+  const remote = normalize({ ...remoteRaw, v: VERSION, settings: local.settings }) || defaultState();
+  const resetAll = Math.max(local.resetAll || 0, remote.resetAll || 0);
+  const resets = { ...remote.resets };
+  for (const [w, t] of Object.entries(local.resets || {})) resets[w] = Math.max(resets[w] || 0, t);
+  const touched = r => Math.max(r.lastSeen || 0, r.levelSince || 0);
+  const alive = (w, r) => r && touched(r) >= Math.max(resetAll, resets[w] || 0);
+  const ahead = (a, b) => {
+    if (!a) return b;
+    if (!b) return a;
+    if (a.level !== b.level) return a.level > b.level ? a : b;
+    if (a.seen !== b.seen) return a.seen > b.seen ? a : b;
+    return touched(a) >= touched(b) ? a : b;
+  };
+  const words = {};
+  for (const w of new Set([...Object.keys(local.words), ...Object.keys(remote.words)])) {
+    const a = alive(w, local.words[w]) ? local.words[w] : null;
+    const b = alive(w, remote.words[w]) ? remote.words[w] : null;
+    if (!a && !b) continue;
+    const rec = structuredClone(ahead(a, b));
+    const seen = new Set();
+    rec.history = [...(a?.history || []), ...(b?.history || [])]
+      .filter(h => { const k = `${h.t}|${h.r}`; return !seen.has(k) && seen.add(k); })
+      .sort((x, y) => x.t - y.t).slice(-CONFIG.historyCap);
+    rec.built = Boolean(a?.built || b?.built);
+    words[w] = rec;
+  }
+  // Lists of events, kept from both devices once each (by time), minus anything before a full reset.
+  const events = k => {
+    const seen = new Set();
+    return [...local[k], ...remote[k]]
+      .filter(e => e && e.t >= resetAll && !seen.has(e.t) && seen.add(e.t))
+      .sort((x, y) => x.t - y.t);
+  };
+  const hatched = [...new Set([...local.hatched, ...remote.hatched])].filter(w => words[w]);
+  return {
+    ...local,
+    setupDone: local.setupDone || remote.setupDone,
+    words, hatched, resets, resetAll,
+    stickers: events('stickers'), sessions: events('sessions'), checks: events('checks').slice(-50),
+  };
 }
