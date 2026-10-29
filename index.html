@@ -370,6 +370,16 @@
     </div>
   </div>
 
+  <!-- Sync conflict: both this device and the cloud changed -->
+  <div id="sync-conflict" class="confirm" hidden>
+    <div class="confirm-box sync-conflict">
+      <p><b>For the grown-up:</b> progress changed on this device and on another one since they last
+        synced (maybe both were played, or one was offline). Which progress should be used?</p>
+      <div id="sync-choices" class="sync-choices"></div>
+      <div class="row-btns"><button id="sync-use" class="small-btn danger">Use this</button></div>
+    </div>
+  </div>
+
   <!-- In-app confirm (never a browser pop-up) -->
   <div id="confirm" class="confirm" hidden>
     <div class="confirm-box">

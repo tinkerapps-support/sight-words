@@ -186,12 +186,13 @@ function nearest(p) {
 // ---------------------------------------------------------------- toys
 
 // Size (CSS px) and where a friend goes to play: its top-left relative to the toy's top-left.
+// Sized to Codex's felt art (toy-*.webp, trimmed to the drawing); the drawn fallbacks fit the same boxes.
 const TOYS = {
-  swing: { w: 124, h: 108, slots: [[29, 36]], ms: 5200 },
+  swing: { w: 132, h: 90, slots: [[33, 22]], ms: 5200 },
   ball: { w: 44, h: 44, slots: [[-54, -24]], ms: 0 },
-  slide: { w: 128, h: 102, slots: [[-16, 36]], ms: 0 },
-  trampoline: { w: 108, h: 62, slots: [[21, -40]], ms: 4500 },
-  seesaw: { w: 136, h: 58, slots: [[-8, -34], [78, -34]], ms: 6000 },
+  slide: { w: 128, h: 96, slots: [[-16, 30]], ms: 0 },
+  trampoline: { w: 108, h: 78, slots: [[21, -31]], ms: 4500 },
+  seesaw: { w: 136, h: 50, slots: [[-4, -50], [74, -50]], ms: 6000 },
 };
 export const TOY_ORDER = ['swing', 'ball', 'slide', 'trampoline', 'seesaw'];
 // Where each toy first appears (fractions of the meadow).
@@ -617,3 +618,8 @@ export function stopPets() { running = false; }
 // For the smoke test.
 export const petState = () => [...pets.values()].map(p => ({ word: p.word, x: p.x, y: p.y, mode: p.mode, toy: p.toy?.kind || null }));
 export const toyState = () => ({ toys: [...toys.values()].map(t => ({ kind: t.kind, x: t.x, y: t.y, users: t.users.filter(Boolean).length })), present: present?.kind || null });
+// For the toy screenshots: put a free friend on every toy slot.
+export function playAll() {
+  const free = [...pets.values()].filter(p => !p.toy);
+  for (const t of toys.values()) t.users.forEach((u, i) => { const p = !u && free.shift(); if (p) startPlay(p, t, i); });
+}

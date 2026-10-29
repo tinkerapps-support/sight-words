@@ -2,8 +2,8 @@
 import { CONFIG, LEVEL_NAMES } from './config.js';
 import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
-import { load, save, record, exportText, importText, defaultState, mergeStates } from './storage.js';
-import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid } from './sync.js';
+import { load, save, record, exportText, importText, defaultState, normalize } from './storage.js';
+import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid, markDirty, listVersions, resolveConflict } from './sync.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
 import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
@@ -11,7 +11,7 @@ import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
 import { popCard, buildCard, clear as clearTask } from './games.js';
-import { showPets, stopPets, call as callPets, petState, toyState, TOY_ORDER } from './pets.js';
+import { showPets, stopPets, call as callPets, petState, toyState, TOY_ORDER, playAll } from './pets.js';
 import { initCheck, startCheck, checkReady, checkWord } from './check.js';
 import { wordStats, setSummary } from './report.js';
 
@@ -44,7 +44,8 @@ let celebrationToken = 0;  // bumped by Undo/Quit so a pending celebration doesn
 let readToken = 0;         // bumped to stop a sentence being read (new card, new reading)
 let lockHolds = 0;         // >0 keeps the next step locked between voice lines (a cloze pause)
 
-const persist = () => save(state);
+// Every save marks this device as changed since its last sync (sync.js decides what to do with it).
+const persist = () => { save(state); markDirty(); };
 const img = src => `<img src="${src}" alt="" draggable="false">`;
 const creatureFor = word => {
   const src = art(`creature-${word.toLowerCase()}`);
@@ -148,30 +149,76 @@ function codeEntry() {
 // Never while a game or Word Check is running (their screens hold the state they started with).
 const playing = () => Boolean(session) || !$('play-screen').hidden || !$('check-screen').hidden;
 let lastSyncTry = 0;
+let conflictOpen = false;
 async function doSync(force = false, { midGame = false } = {}) {
-  if (!syncInfo().code || (playing() && !midGame)) return;
+  if (!syncInfo().code || conflictOpen || (playing() && !midGame)) return;
   if (!force && Date.now() - lastSyncTry < 4000) return;
   lastSyncTry = Date.now();
   renderSyncBox('Syncing…');
-  if (midGame) {
-    // During a game: save this device's progress to the cloud (merged, so nothing there is lost)
-    // but leave the game's own state alone; the next sync at the meadow brings everything together.
-    syncNow(state).catch(() => {}).finally(() => renderSyncBox());
-    return;
-  }
   try {
-    const merged = await syncNow(state);
-    // Merge again with this device's current state, so taps made while syncing aren't lost.
-    if (merged && !playing()) {
-      const { settings, ...shared } = merged;
-      state = mergeStates(state, shared);
-      persist();
-      if (!$('home').hidden) renderHome();
-      if (!$('progress-screen').hidden) renderProgress();
-      if (!$('sticker-screen').hidden) renderStickers();
-    }
+    const r = await syncNow(state, { midGame });
+    if (r.conflict) showConflict();
+    else if (r.state && !playing()) adopt(r.state);
   } catch { /* the status line shows the error; it retries next time */ }
   renderSyncBox();
+}
+
+// Use progress that came from the cloud. Saved without marking this device as changed.
+function adopt(next) {
+  state = normalize({ ...next, v: 1, settings: state.settings }) || state;
+  save(state);
+  if (!$('home').hidden) renderHome();
+  if (!$('progress-screen').hidden) renderProgress();
+  if (!$('sticker-screen').hidden) renderStickers();
+  if (!$('settings-screen').hidden) renderSettings();
+}
+
+// Both this device and the cloud changed since they last synced (two devices at once, or one was
+// offline): the grown-up picks what to keep. Combining keeps everything and is the default.
+const summary = st => {
+  const words = Object.values(st.words || {});
+  const last = Math.max(0, ...(st.sessions || []).map(x => x.t), ...(st.checks || []).map(x => x.t), ...words.map(r => r.lastSeen || 0));
+  const when = last ? new Date(last).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never';
+  return `${(st.hatched || []).length} friends · ${words.filter(r => r.level >= 4).length} words known · ${(st.stickers || []).length} stickers · last played ${when}`;
+};
+async function showConflict() {
+  conflictOpen = true;
+  let versions = [];
+  try { versions = await listVersions(); } catch { /* combine / this device still work */ }
+  const options = [
+    { value: 'combine', title: 'Combine both (recommended)', detail: 'Keeps everything from every device. Nothing is lost.' },
+    { value: 'device', title: `This ${'device'}`, detail: summary(state) },
+    ...versions.map(v => ({
+      value: v.state, title: `Saved ${new Date(v.updated).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} on ${v.mine ? 'this device' : (v.device || 'another device')}`,
+      detail: summary(v.state || {}),
+    })),
+  ];
+  const list = $('sync-choices');
+  list.innerHTML = '';
+  let picked = 0;
+  options.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'sync-choice' + (i === 0 ? ' on' : '');
+    b.innerHTML = `<b>${o.title}</b><span>${o.detail}</span>`;
+    b.addEventListener('click', () => { picked = i; list.querySelectorAll('.sync-choice').forEach((x, j) => x.classList.toggle('on', j === i)); });
+    list.appendChild(b);
+  });
+  $('sync-conflict').hidden = false;
+  $('sync-use').onclick = async () => {
+    const o = options[picked];
+    if (o.value !== 'combine') {
+      $('sync-conflict').hidden = true;
+      const ok = await mathCheck('This replaces the progress on your other devices with the one you picked. The other saved versions stay available.');
+      if (!ok) { $('sync-conflict').hidden = false; return; }
+    }
+    $('sync-conflict').hidden = true;
+    renderSyncBox('Syncing…');
+    try {
+      adopt(await resolveConflict(state, o.value));
+    } catch { /* stays unresolved; it will ask again next time */ }
+    conflictOpen = false;
+    renderSyncBox();
+  };
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') doSync(); });
 
@@ -184,11 +231,12 @@ function renderSyncBox(status) {
   const when = info.lastSync ? new Date(info.lastSync).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet';
   $('sync-status').textContent = status || (info.lastError ? `Couldn't sync (${info.lastError}). It will try again. Last synced: ${when}.` : `Last synced: ${when}.`);
 }
-$('sync-create').addEventListener('click', () => { setCode(newCode()); doSync(true); renderSyncBox(); });
+$('sync-create').addEventListener('click', () => { setCode(newCode(), true); doSync(true); renderSyncBox(); });
 $('sync-enter').addEventListener('click', async () => {
   const code = await codeEntry();
   if (!code) return;
-  setCode(code);
+  // If this device already has progress, joining asks how to mix it with the synced copy.
+  setCode(code, Object.keys(state.words).length > 0 || state.stickers.length > 0);
   renderSyncBox();
   await doSync(true);
 });
@@ -211,6 +259,20 @@ $('start').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------- home / meadow
+
+// After a rotation, have the meadow grid measure itself again (iOS Safari can keep the old
+// cell sizes otherwise).
+let lastShape = '';
+window.addEventListener('resize', () => {
+  const shape = innerWidth > innerHeight ? 'wide' : 'tall';
+  if (shape === lastShape) return;
+  lastShape = shape;
+  const m = $('meadow');
+  if (!m || $('home').hidden) return;
+  m.style.display = 'none';
+  void m.offsetHeight;
+  m.style.display = '';
+});
 
 function renderHome() {
   const enabled = LISTS.filter(l => state.settings.lists.includes(l.id));
@@ -1258,4 +1320,4 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.hostname 
 }
 initCheck({ state: () => state, persist, go, show, entries, setMascot, burst });
 doSync(true);
-window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, toys: toyState, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test
+window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, toys: toyState, playAll, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test
