@@ -20,6 +20,8 @@ export const OTHER = {
   'your-turn': 'Your turn! Can you say it?',
   'pop-start': 'Pop the bubble with the word you hear!',
   'try-again': 'Try another one!',
+  'present': 'A present! Tap it to open it.',
+  'new-toy': 'A new toy for your friends!',
   'check-start': 'Word check! Listen, then tap the word you hear.',
   'check-end': 'You finished the word check!',
   'build-start': "Let's build the word! Drag each letter into its box.",

@@ -575,3 +575,98 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 body { -webkit-touch-callout: none; }
 img { -webkit-user-drag: none; }
 input, textarea, select, .sync-code { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+/* ---- Meadow toys (pets.js) ---- */
+.toy { position: absolute; left: 0; top: 0; pointer-events: auto; touch-action: none; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.toy img { pointer-events: none; }
+.toy.held { filter: drop-shadow(0 10px 12px rgba(60,30,60,0.28)); z-index: 9000 !important; }
+.toy.arrive { animation: toy-arrive 0.7s cubic-bezier(.3,1.6,.5,1); }
+@keyframes toy-arrive { from { scale: 0.2; opacity: 0; } }
+.toy.wiggle, .toy-slide.wiggle { animation: nudge 0.45s; }
+
+/* swing */
+.toy-swing .t-frame { position: absolute; inset: 0; }
+.toy-swing img.t-frame { width: 100%; height: 100%; object-fit: contain; }
+.toy-swing .leg { position: absolute; bottom: 0; width: 8px; height: 104px; border-radius: 4px; background: #c9a7e8; transform-origin: 50% 100%; }
+.toy-swing .leg.l { left: 14px; transform: rotate(8deg); }
+.toy-swing .leg.r { right: 14px; transform: rotate(-8deg); }
+.toy-swing .bar { position: absolute; top: 2px; left: 8px; right: 8px; height: 9px; border-radius: 5px; background: #ff9ac4; }
+.toy-swing .t-seat { position: absolute; left: 37px; width: 50px; top: 8px; height: 92px; transform-origin: 50% 0; }
+.toy-swing .t-seat-img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 0; }
+.toy-swing .rope { position: absolute; top: 0; width: 2px; height: 86px; background: #a58bb5; }
+.toy-swing .rope.l { left: 6px; } .toy-swing .rope.r { right: 6px; }
+.toy-swing .board { position: absolute; bottom: 0; left: 0; right: 0; height: 9px; border-radius: 5px; background: #ffbf8f; }
+.toy-swing.active .t-seat { animation: swing 1.6s ease-in-out infinite; }
+.toy-swing.sway .t-seat { animation: swing 1.6s ease-in-out 1; }
+.pet.ride-swing .pet-body { transform-origin: 33px -28px; animation: swing 1.6s ease-in-out infinite; }
+@keyframes swing { 0%, 100% { transform: rotate(18deg); } 50% { transform: rotate(-18deg); } }
+
+/* ball */
+.toy-ball .t-ball { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(#ff9ac4, #ffd98a, #9fe3c4, #9ec9ff, #c9a7e8, #ff9ac4); box-shadow: inset -4px -4px 0 rgba(0,0,0,0.08); }
+.toy-ball.felt .t-ball { background: none; box-shadow: none; }
+.toy-ball .t-ball-img { width: 100%; height: 100%; object-fit: contain; }
+
+/* slide */
+.toy-slide .t-whole { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.toy-slide .ladder { position: absolute; left: 4px; top: 18px; bottom: 0; width: 22px; border-left: 4px solid #c9a7e8; border-right: 4px solid #c9a7e8; background: repeating-linear-gradient(#c9a7e8 0 4px, transparent 4px 14px); }
+.toy-slide .deck { position: absolute; left: 2px; top: 14px; width: 34px; height: 8px; border-radius: 4px; background: #ff9ac4; }
+.toy-slide .chute { position: absolute; left: 28px; top: 16px; width: 121px; height: 14px; border-radius: 8px; background: linear-gradient(#ffd1e6, #ff9ac4); transform-origin: 0 50%; transform: rotate(39deg); }
+.pet.ride-slide .pet-body { animation: ride-slide 2.6s ease-in-out forwards; }
+@keyframes ride-slide {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(2px, -20px) rotate(-4deg); }
+  20% { transform: translate(4px, -40px) rotate(4deg); }
+  30% { transform: translate(6px, -60px) rotate(-4deg); }
+  42%, 50% { transform: translate(8px, -78px); }
+  85% { transform: translate(100px, -4px) rotate(-10deg); }
+  100% { transform: translate(104px, 0); }
+}
+
+/* trampoline */
+.toy-trampoline .t-whole { width: 100%; height: 100%; object-fit: contain; }
+.toy-trampoline .tleg { position: absolute; bottom: 0; width: 6px; height: 22px; background: #a58bb5; }
+.toy-trampoline .tleg.l { left: 18px; } .toy-trampoline .tleg.r { right: 18px; }
+.toy-trampoline .t-mat { position: absolute; left: 0; right: 0; top: 14px; height: 30px; border-radius: 50%; background: radial-gradient(#7c6a9a 0 55%, #ff9ac4 56% 100%); transform-origin: 50% 50%; }
+.toy-trampoline.felt .t-mat { top: 0; height: 100%; border-radius: 0; background: none; }
+.toy-trampoline.active .t-mat { animation: mat 0.9s ease-in-out infinite; }
+.toy-trampoline.boing .t-mat { animation: mat 0.45s ease-in-out 2; }
+.pet.ride-trampoline .pet-body { animation: ride-bounce 0.9s ease-in-out infinite; }
+@keyframes mat { 0%, 100% { transform: scale(1.05, 0.78); } 12%, 88% { transform: none; } }
+@keyframes ride-bounce {
+  0%, 100% { transform: translateY(6px) scale(1.08, 0.9); }
+  15% { transform: translateY(0) scale(0.95, 1.05); }
+  50% { transform: translateY(-70px) rotate(8deg); }
+  85% { transform: translateY(0) scale(0.97, 1.03); }
+}
+
+/* seesaw */
+.toy-seesaw .t-base { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); }
+.toy-seesaw i.t-base { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 30px solid #c9a7e8; }
+.toy-seesaw img.t-base { height: 62%; }
+.toy-seesaw .t-plank { position: absolute; left: 0; right: 0; top: 16px; height: 14px; transform-origin: 50% 50%; }
+.toy-seesaw.felt .t-plank { top: 6px; height: 30px; }
+.toy-seesaw .board { position: absolute; inset: 0; border-radius: 7px; background: #ffbf8f; }
+.toy-seesaw .t-plank-img { width: 100%; height: 100%; object-fit: contain; }
+.toy-seesaw.active .t-plank { animation: seesaw 1.8s ease-in-out infinite; }
+.toy-seesaw.tip .t-plank { animation: seesaw 1.8s ease-in-out 1; }
+.pet.ride-seesaw.slot-0 .pet-body { animation: see-l 1.8s ease-in-out infinite; }
+.pet.ride-seesaw.slot-1 .pet-body { animation: see-r 1.8s ease-in-out infinite; }
+@keyframes seesaw { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes see-l { 0%, 100% { transform: translateY(14px); } 50% { transform: translateY(-14px); } }
+@keyframes see-r { 0%, 100% { transform: translateY(-14px); } 50% { transform: translateY(14px); } }
+
+/* the present */
+.toy.present { width: 84px; height: 84px; font-size: 64px; line-height: 84px; text-align: center; filter: drop-shadow(0 6px 8px rgba(90,58,94,0.25)); animation: present-bob 1.6s ease-in-out infinite; }
+.toy.present img { width: 100%; height: 100%; object-fit: contain; }
+.toy.present.opening { animation: present-open 1.1s ease-in forwards; }
+@keyframes present-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+@keyframes present-open {
+  0% { rotate: 0deg; } 10% { rotate: -14deg; } 20% { rotate: 14deg; } 30% { rotate: -14deg; } 40% { rotate: 14deg; }
+  50% { rotate: -8deg; scale: 1.05; } 70% { rotate: 0deg; scale: 1.25; } 100% { scale: 1.7; opacity: 0; }
+}
+.toy-confetti { position: absolute; width: 24px; height: 24px; z-index: 9999; pointer-events: none; animation: fly 1s ease-out forwards; }
+.toy-confetti img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Her turn to say it back: a little ear on the card while the app stays quiet */
+.card.listening::after { content: '👂'; position: absolute; top: 10px; right: 14px; font-size: 2rem; animation: listen 1s ease-in-out infinite; }
+@keyframes listen { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.2); opacity: 1; } }

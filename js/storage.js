@@ -18,6 +18,7 @@ export function defaultState() {
     checks: [],       // Word Check results: { t, right, total, missed, asked }
     resets: {},       // word -> when the parent reset it (so sync doesn't bring old progress back)
     resetAll: 0,      // when all progress was last reset
+    toysOpened: {},   // list id -> how many of that meadow's toy presents have been opened
     settings: {
       lists: [LISTS[0].id],
       fullscreen: false,
@@ -45,6 +46,7 @@ export function normalize(raw) {
   for (const k of ['hatched', 'stickers', 'sessions', 'checks']) if (!Array.isArray(state[k])) state[k] = [];
   if (!state.resets || typeof state.resets !== 'object') state.resets = {};
   if (typeof state.resetAll !== 'number') state.resetAll = 0;
+  if (!state.toysOpened || typeof state.toysOpened !== 'object') state.toysOpened = {};
   state.settings.lists = state.settings.lists.filter(id => LISTS.some(l => l.id === id));
   if (!state.settings.lists.length) state.settings.lists = [LISTS[0].id];
   return state;
@@ -122,10 +124,14 @@ export function mergeStates(local, remoteRaw) {
       .sort((x, y) => x.t - y.t);
   };
   const hatched = [...new Set([...local.hatched, ...remote.hatched])].filter(w => words[w]);
+  const toysOpened = resetAll > (local.resetAll || 0) ? {} : { ...local.toysOpened };
+  if ((remote.resetAll || 0) >= (local.resetAll || 0)) {
+    for (const [id, n] of Object.entries(remote.toysOpened || {})) toysOpened[id] = Math.max(toysOpened[id] || 0, n);
+  }
   return {
     ...local,
     setupDone: local.setupDone || remote.setupDone,
-    words, hatched, resets, resetAll,
+    words, hatched, resets, resetAll, toysOpened,
     stickers: events('stickers'), sessions: events('sessions'), checks: events('checks').slice(-50),
   };
 }

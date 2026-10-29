@@ -11,7 +11,7 @@ import { TIMINGS } from './voice-timings.js';
 import * as device from './device.js';
 import { art } from './art.js';
 import { popCard, buildCard, clear as clearTask } from './games.js';
-import { showPets, stopPets, call as callPets, petState } from './pets.js';
+import { showPets, stopPets, call as callPets, petState, toyState, TOY_ORDER } from './pets.js';
 import { initCheck, startCheck, checkReady, checkWord } from './check.js';
 import { wordStats, setSummary } from './report.js';
 
@@ -69,7 +69,9 @@ function go(name) {
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
-  if (id === 'home' || id === 'settings-screen') doSync();
+  // Back to the meadow (from a game, a Word Check or Settings): save to the cloud every time.
+  if (id === 'home') doSync(true);
+  if (id === 'settings-screen') doSync();
   if (id === 'setup-screen') renderSetup();
   if (id === 'settings-screen') renderSettings();
   if (id === 'progress-screen') renderProgress();
@@ -146,11 +148,17 @@ function codeEntry() {
 // Never while a game or Word Check is running (their screens hold the state they started with).
 const playing = () => Boolean(session) || !$('play-screen').hidden || !$('check-screen').hidden;
 let lastSyncTry = 0;
-async function doSync(force = false) {
-  if (!syncInfo().code || playing()) return;
+async function doSync(force = false, { midGame = false } = {}) {
+  if (!syncInfo().code || (playing() && !midGame)) return;
   if (!force && Date.now() - lastSyncTry < 4000) return;
   lastSyncTry = Date.now();
   renderSyncBox('Syncing…');
+  if (midGame) {
+    // During a game: save this device's progress to the cloud (merged, so nothing there is lost)
+    // but leave the game's own state alone; the next sync at the meadow brings everything together.
+    syncNow(state).catch(() => {}).finally(() => renderSyncBox());
+    return;
+  }
   try {
     const merged = await syncNow(state);
     // Merge again with this device's current state, so taps made while syncing aren't lost.
@@ -238,10 +246,25 @@ function renderHome() {
   // Wait a frame so the meadow has its size before friends are placed in it.
   requestAnimationFrame(() => {
     if ($('home').hidden) return;
+    // A toy for every CONFIG.toys.perFriends friends hatched on this meadow, delivered as a present.
+    const earned = Math.min(TOY_ORDER.length, Math.floor(friends.length / CONFIG.toys.perFriends));
+    const opened = Math.min(state.toysOpened[list.id] || 0, earned);
     showPets($('pet-layer'), friends, {
       html: creatureFor,
       crowned: w => levelOf(w) >= 5,
       heart: () => (art('fx-heart') ? img(art('fx-heart')) : '💖'),
+      art,
+      toys: {
+        page: list.id,
+        kinds: TOY_ORDER.slice(0, opened),
+        present: earned > opened ? TOY_ORDER[opened] : null,
+        onOpen: () => {
+          state.toysOpened = { ...state.toysOpened, [list.id]: opened + 1 };
+          persist();
+          doSync(true);
+          if (earned > opened + 1) setTimeout(() => { if (!$('home').hidden) renderHome(); }, 3000);
+        },
+      },
     });
   });
   $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
@@ -508,7 +531,9 @@ async function sayWord() {
   const word = card.word;
   card.shown.add('say');
   await audio.say(wordId(word), word);
-  if (card?.word === word && !busy) audio.say('say-it-again', 'Can you say it too?');
+  if (card?.word !== word || busy) return;
+  await audio.say('say-it-again', 'Can you say it too?');
+  await yourTurn(() => card?.word === word && !busy);
 }
 
 ['notyet', 'got', 'fast'].forEach(r => $(`btn-${r}`).addEventListener('click', () => answer(r)));
@@ -700,7 +725,7 @@ function celebrate(fast, hatchedNow, change) {
   if (state.meter >= CONFIG.meterBands) { state.meter = 0; full = true; }
   persist();
   renderMeter(full);
-  if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); }
+  if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); doSync(true, { midGame: true }); }
   // A voice cheer now and then, not on every card (never over a hatching).
   let cheer = Promise.resolve();
   if (full && !hatchedNow) cheer = audio.say('rainbow-full', 'A whole rainbow!');
@@ -747,6 +772,7 @@ async function teach(word) {
   if (still()) await pause(300);
   const entry = wordEntry(word);
   if (still() && entry) await readSentence(word, { cloze: false });
+  await yourTurn(still);
 }
 
 // Reads the card's sentence, lighting up each word as it's spoken. cloze: the voice stops where
@@ -810,6 +836,22 @@ async function sayHighlighted(id, text, spans) {
   spans.forEach(s => s.classList.remove('now'));
 }
 
+// Her turn to say it: a quiet pause with a little ear on the card, and Next / the answer buttons
+// stay locked so the next line can't talk over her (owner, 2026-10-28).
+async function yourTurn(still) {
+  if (!still()) return;
+  lockHolds++;
+  applyLock();
+  $('card').classList.add('listening');
+  try {
+    await new Promise(r => setTimeout(r, CONFIG.yourTurnMs));
+  } finally {
+    $('card').classList.remove('listening');
+    lockHolds--;
+    applyLock();
+  }
+}
+
 // Spell–read: each letter lights up as its name is said, then the whole word ("w – a – s… was").
 // Tying the letters to the word is what makes irregular words stick.
 async function spellRead(word, still) {
@@ -845,6 +887,7 @@ async function introduce(word) {
   const entry = wordEntry(word);
   if (still() && entry) await readSentence(word, { cloze: false });
   if (still()) await audio.say('your-turn', 'Your turn! Can you say it?');
+  await yourTurn(still);
 }
 $('next').addEventListener('click', () => {
   audio.stop();
@@ -1215,4 +1258,4 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.hostname 
 }
 initCheck({ state: () => state, persist, go, show, entries, setMascot, burst });
 doSync(true);
-window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test
+window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, toys: toyState, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test

@@ -122,6 +122,8 @@ export const VOICE_CLIPS = {
  "your-turn": "your-turn.mp3",
  "pop-start": "pop-start.mp3",
  "try-again": "try-again.mp3",
+ "present": "present.mp3",
+ "new-toy": "new-toy.mp3",
  "check-start": "check-start.mp3",
  "check-end": "check-end.mp3",
  "build-start": "build-start.mp3",

@@ -14,7 +14,8 @@ export const CONFIG = {
   promoteKnownAfterDays: 3,  // level 4 → 5 needs a Fast review this long after reaching 4
   reviewGapsDays: [1, 3, 7, 14, 30],
   meterBands: 7,
-  clozePauseMs: 1700,        // the pause where the word goes when a hint sentence is read
+  clozePauseMs: 1700,
+  yourTurnMs: 4000,          // quiet time for her to say it back (after "Your turn!", teaching, Say it)        // the pause where the word goes when a hint sentence is read
   historyCap: 60,
   // Adaptive pace (owner, 2026-10-28): how fast new words come, from her recent scored cards.
   pace: {
@@ -33,7 +34,8 @@ export const CONFIG = {
       2: { maxShaky: 6, targets: 3, topUps: 2 },
     },
   },
-  check: { grid: 10 },       // Word Check: words on screen per question
+  check: { grid: 10 },
+  toys: { perFriends: 5 },   // a meadow toy (as a present) for every 5 friends hatched there       // Word Check: words on screen per question
   popsToLearn: 2,
   // Bubbles on a Bubble Pop card: more for a word she knows well (owner, 2026-10-28).
   bubbles: { base: 3, afterFirstTryPop: 4, hatched: 5, crowned: 6 },            // first-try Bubble Pops in a row: Learning → Getting it
