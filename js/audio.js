@@ -5,7 +5,14 @@ let volume = 0.9;
 let effects = true;
 let ctx = null;
 let current = null;      // { audio } or { utterance }
-const cache = new Map();
+// One shared player for every clip. iOS only lets a media element play without a tap once it
+// has played from one, so the first tap unlocks it (unlock()) and every line reuses it.
+let player = null;
+let playerUnlocked = false;
+const voicePlayer = () => {
+  if (!player) { player = new Audio(); player.preload = 'auto'; }
+  return player;
+};
 
 export function configure({ voiceVolume, effects: fx }) {
   if (typeof voiceVolume === 'number') volume = voiceVolume;
@@ -14,10 +21,22 @@ export function configure({ voiceVolume, effects: fx }) {
 
 // Call from a tap: Chrome on Android only allows sound after one.
 export function unlock() {
+  // iOS 17+: play music and chimes even with the silent switch on (like a media app).
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* older iOS */ }
   try {
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
   } catch { /* no Web Audio: chimes stay silent */ }
+  if (!playerUnlocked && !current) {
+    const first = Object.values(VOICE_CLIPS)[0];
+    const p = voicePlayer();
+    if (first) {
+      playerUnlocked = true;
+      p.muted = true;
+      p.src = `assets/voice/${first}`;
+      p.play().then(() => { if (!current) p.pause(); }).catch(() => { playerUnlocked = false; }).finally(() => { p.muted = false; });
+    }
+  }
   warmSpeech();
 }
 
@@ -67,12 +86,13 @@ export function hasClip(id) {
   return Boolean(VOICE_CLIPS[id]);
 }
 
+// Fetch the game's clips ahead of time so they're in the offline cache when needed.
+const fetched = new Set();
 export function preload(ids) {
   for (const id of ids) {
-    if (!VOICE_CLIPS[id] || cache.has(id)) continue;
-    const a = new Audio(`assets/voice/${VOICE_CLIPS[id]}`);
-    a.preload = 'auto';
-    cache.set(id, a);
+    if (!VOICE_CLIPS[id] || fetched.has(id)) continue;
+    fetched.add(id);
+    fetch(`assets/voice/${VOICE_CLIPS[id]}`).catch(() => fetched.delete(id));
   }
 }
 
@@ -130,9 +150,11 @@ function play(id, text, resolve, opts) {
     };
     const file = VOICE_CLIPS[id];
     if (file) {
-      const audio = cache.get(id) || new Audio(`assets/voice/${file}`);
-      cache.set(id, audio);
-      audio.currentTime = 0;
+      const audio = voicePlayer();
+      const url = `assets/voice/${file}`;
+      audio.muted = false;
+      if (!audio.src.endsWith(url)) audio.src = url;
+      else audio.currentTime = 0;
       audio.volume = volume;
       audio.onended = done;
       // Fall back to device speech only if the clip itself can't play: a clip cut off by the next

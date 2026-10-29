@@ -1020,7 +1020,8 @@ function renderSettings() {
   const s = state.settings;
   $('set-fullscreen').checked = s.fullscreen;
   $('set-fullscreen').disabled = !device.fullscreenSupported();
-  $('fs-note').textContent = !device.fullscreenSupported() ? 'This browser can\'t go full screen.'
+  $('fs-note').textContent = device.isInstalled() && !device.fullscreenSupported() ? 'Opened from the home screen icon, so it\'s already full screen.'
+    : !device.fullscreenSupported() ? 'This browser can\'t go full screen. On iPhone: Share → Add to Home Screen, then open it from the icon.'
     : device.isInstalled() ? 'Opened from the home screen icon, so it\'s already full screen.'
     : s.fullscreen && !device.isFullscreen() ? 'Full screen was left (Back or a swipe). Tap Play or ⛶ to return.' : '';
   $('set-wake').checked = s.wakeLock;

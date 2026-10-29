@@ -570,3 +570,8 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .sync-code { display: block; margin: 6px 0; padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px dashed #d9b8cc;
   font-family: ui-monospace, Consolas, monospace; font-size: 1.05rem; letter-spacing: 0.04em; word-break: break-all; color: var(--ink); user-select: all; }
 #code-input { text-transform: uppercase; font-family: ui-monospace, Consolas, monospace; }
+
+/* iOS: no copy/save callout on long press (the gear hold, dragging friends and letters) */
+body { -webkit-touch-callout: none; }
+img { -webkit-user-drag: none; }
+input, textarea, select, .sync-code { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
