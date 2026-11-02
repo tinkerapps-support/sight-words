@@ -219,8 +219,8 @@
         Each egg has 6 buttons that fill on the way:</p>
       <ol>
         <li>Meets the word (the new-word card)</li>
-        <li>Pops its bubble on the first try</li>
-        <li>Pops it on the first try again → <i>Getting it</i> (spotted egg)</li>
+        <li>Pops the right bubble</li>
+        <li>Pops the right bubble again → <i>Getting it</i> (spotted egg)</li>
         <li>A Fast read</li>
         <li>A second Fast read in a row → <i>Almost</i> (cracked egg)</li>
         <li>A Fast read on a <b>later day</b> → it <b>hatches!</b></li>
@@ -230,6 +230,9 @@
         back a step or two. A friend never goes back into its egg.</p>
       <p>After hatching, spelling the word in Build It (right on the first try) plus a Fast read 3 or
         more days later earns its <b>crown</b>.</p>
+      <p><b>Toys:</b> every 5 friends hatched on a meadow bring a wrapped present to tap open: a swing,
+        ball, slide, trampoline and seesaw (5 toys per meadow). The meadow's friend count says how many
+        more friends the next toy needs.</p>
       <p><b>Tap any egg</b> in the meadow to see how close it is and what it needs next.</p>
 
       <h3>Word Check</h3>
@@ -242,20 +245,21 @@
       <p>Sit together and tap <b>Play</b>. A word shows up, your child reads it out loud, and you tap
         one of the three buttons at the bottom:</p>
       <ul>
-        <li><b>⚡ Fast</b>: read right away, in about two seconds, with no help.</li>
-        <li><b>✓ Got it</b>: right, but it took some working out or a hint.</li>
-        <li><b>↺ Not yet</b>: wrong, or no answer. That's completely fine.</li>
+        <li><b><span class="glyph" data-icon="ui-fast">⚡</span> Fast</b>: read right away, in about two seconds, with no help.</li>
+        <li><b><span class="glyph" data-icon="ui-check">✓</span> Got it</b>: right, but it took some working out or a hint.</li>
+        <li><b><span class="glyph" data-icon="ui-notyet">↺</span> Not yet</b>: wrong, or no answer. That's completely fine.</li>
       </ul>
       <p>Be honest with Fast. It's the button that tells the app a word is really learned, so
         when you're not sure, tap Got it. A game takes about five minutes. Tapped the wrong button?
         <b>Undo</b> fixes it.</p>
 
       <h3>Hints</h3>
-      <p>If your child pauses, help appears on its own: the word's first letter sparkles,
-        and a picture sentence is read aloud with a gap where the word goes, so they can fill it in.
-        Help comes sooner for new words and fades as a word gets easier.</p>
+      <p>Help never appears on its own. If nobody touches the screen for 10 seconds, a hand points
+        at <b>Hint</b>. The first tap makes the word's first letter sparkle; the second shows a
+        picture sentence, read aloud with a gap where the word goes, so they can fill it in.</p>
       <p>You can give help any time with <b>Hint</b> or <b>Say it</b>. After a Say it, tap Got it or
-        Not yet, never Fast. The app counts a Fast with a hint showing as Got it anyway.</p>
+        Not yet, never Fast. A Fast with a hint showing counts as Got it, unless it came within 2
+        seconds of the hint appearing (they were already reading it). After Say it, it is always Got it.</p>
 
       <h3>When a word is missed</h3>
       <p>There are no red crosses or sad sounds. After Not yet, the app says the word, spells it
@@ -283,7 +287,7 @@
       <ul>
         <li>One short game a day works better than a long one now and then. Coming back on another
           day is what makes words stick.</li>
-        <li>Stop while it's still fun. The ✕ button ends a game early and keeps everything learned so far.</li>
+        <li>Stop while it's still fun. The <span class="glyph" data-icon="ui-close">✕</span> button ends a game early and keeps everything learned so far.</li>
         <li>Praise the trying, not only the right answers.</li>
         <li>Every reading game earns a sticker, whatever happens.</li>
       </ul>
@@ -299,7 +303,7 @@
         buttons for sound (iOS ignores the app's voice volume slider).</p>
 
       <h3>Settings</h3>
-      <p>Press and hold the ⚙ gear for three seconds (so little fingers don't open it by accident).
+      <p>Press and hold the <span class="glyph" data-icon="ui-settings">⚙</span> gear for three seconds (so little fingers don't open it by accident).
         There you can mark words your child already knows (<b>Head start</b>), change the game
         length, turn music and sounds on or off, see <b>Progress</b>, and save a <b>backup</b>.
         Progress lives on this phone, so either save a <b>backup</b> now and then or turn on <b>Sync</b>:
@@ -326,7 +330,7 @@
         when no hint was showing (Fast with a hint counts as Got it).</p>
       <ol>
         <li>Meets the word (new-word card)</li>
-        <li><b>Bubble Pop</b>: pops its bubble on the first try, twice in a row → <i>Getting it</i> (spotted egg)</li>
+        <li><b>Bubble Pop</b>: pops the right bubble twice in a row → <i>Getting it</i> (spotted egg)</li>
         <li><b>Reading</b>: 2 Fast reads in a row → <i>Almost</i> (cracked egg)</li>
         <li>A Fast read on a <b>later day</b> → <i>Known</i>: it hatches</li>
         <li><b>Build It</b>: spelled right on the first try, plus a Fast read 3+ days after hatching → <i>Mastered</i>: a crown</li>
@@ -334,6 +338,7 @@
       <p>Head-start words begin at Almost, so one Fast read on a later day hatches them. Not yet moves a
         word back at most two levels (back to Bubble Pop if it slips that far). A creature never goes back
         into its egg.</p>
+      <p>Every 5 friends hatched on a meadow bring a present with a new toy (up to 5 toys per meadow).</p>
     </details>
     <p id="progress-ready" class="ready" hidden>Ready for the next list! Turn it on in Settings → Word lists.</p>
     <div id="progress-grid" class="report-words"></div>

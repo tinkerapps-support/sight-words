@@ -46,13 +46,13 @@ const SPOTS = {
   6: [[2, 4], [36, 0], [68, 8], [4, 48], [38, 40], [68, 54]],
 };
 
-// Three bubbles bob in place (nothing is timed). A wrong bubble fades with "Try another one!";
-// onDone(firstTry) runs once she pops the right one.
+// Three bubbles bob in place (nothing is timed). Popping the right one runs onDone(true). A wrong
+// one is a miss (owner, 2026-11-01): it fades, the right bubble lights up and onDone(false, picked) runs
+// (main.js says the word and moves on); no second try, so a miss never ends on a success pop.
 export function popCard({ word, entries, show, count = 3, onWrong, onDone }) {
   const token = live = {};
   const area = $('pop-area');
   area.innerHTML = '';
-  let firstTry = true;
   const choices = shuffle([word, ...distractors(word, entries, show, count - 1)]);
   const spots = shuffle(SPOTS[choices.length] || SPOTS[3]);
   area.dataset.n = String(choices.length);
@@ -66,20 +66,18 @@ export function popCard({ word, entries, show, count = 3, onWrong, onDone }) {
     b.style.setProperty('--d', `${i * 0.15}s`);
     b.addEventListener('click', async () => {
       if (live !== token || b.disabled) return;
+      area.querySelectorAll('.bubble').forEach(x => { x.disabled = true; });
       if (w === word) {
-        area.querySelectorAll('.bubble').forEach(x => { x.disabled = true; });
         b.classList.add('popped');
         audio.chime.pop();
-        setTimeout(() => { if (live === token) onDone(firstTry); }, 350);
+        setTimeout(() => { if (live === token) onDone(true); }, 350);
         return;
       }
-      firstTry = false;
-      b.disabled = true;
       b.classList.add('nope');
+      [...area.children][choices.indexOf(word)].classList.add('reveal');
       audio.chime.gentle();
       onWrong?.();
-      await audio.say('try-again', 'Try another one!');
-      if (live === token) audio.say(wordId(word), word);
+      setTimeout(() => { if (live === token) onDone(false, w); }, 450);
     });
     area.appendChild(b);
   });

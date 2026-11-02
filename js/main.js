@@ -1,6 +1,6 @@
 // Screens and wiring. The learning rules live in engine.js; this file only drives the UI.
 import { CONFIG, LEVEL_NAMES } from './config.js';
-import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, supportLevel, restWord, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
+import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, restWord, spellable, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
 import { load, save, record, exportText, importText, defaultState, normalize } from './storage.js';
 import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid, markDirty, listVersions, resolveConflict } from './sync.js';
@@ -61,6 +61,12 @@ const eggFor = stage => {
   return src ? img(src) : `<span class="egg ${stage ? 's' + stage : ''}"></span>`;
 };
 const levelOf = word => state.words[word]?.level ?? 0;
+// The engine's "what's next" line, with a felt crown (Mastered) or moon (waiting for tomorrow).
+const stepHtml = (rec, now) => {
+  const text = nextStep(rec, now);
+  const icon = rec?.level >= 5 ? 'ui-crown' : /tomorrow hatches/.test(text) ? 'ui-moon' : null;
+  return icon && art(icon) ? `${text} <img class="step-icon" src="${art(icon)}" alt="" draggable="false">` : text;
+};
 
 // ---------------------------------------------------------------- navigation
 
@@ -303,7 +309,7 @@ function renderHome() {
     }
     m.appendChild(b);
   }
-  $('meadow-count').textContent = `${hatched} of ${list.words.length} friends`;
+  $('meadow-count').textContent = `${hatched} of ${list.words.length} friends` + toyHint(hatched, list.words.length);
   $('check-btn').hidden = !checkReady();
   // Wait a frame so the meadow has its size before friends are placed in it.
   requestAnimationFrame(() => {
@@ -331,6 +337,13 @@ function renderHome() {
   });
   $('sticker-count').textContent = `${state.stickers.length} sticker${state.stickers.length === 1 ? '' : 's'}`;
   $('fs-again').hidden = !(state.settings.fullscreen && !device.isFullscreen() && !device.isInstalled() && device.fullscreenSupported());
+}
+// How the next meadow toy is earned: one arrives as a present for every few friends hatched.
+function toyHint(hatched, total) {
+  const per = CONFIG.toys.perFriends, next = (Math.floor(hatched / per) + 1) * per;
+  if (next / per > TOY_ORDER.length || next > total) return '';
+  const left = next - hatched;
+  return ` · ${left} more for a new toy`;
 }
 // A tap on the grass (not an egg or a friend) calls the friends over.
 $('meadow-wrap').addEventListener('click', e => {
@@ -406,7 +419,7 @@ function startSession(kind) {
     queue = built.queue;
     clash = built.clash;
   }
-  session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 && cardKind(state.words[w], () => 1) === 'read' });
+  session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 && cardKind(state.words[w], () => 1, w) === 'read' });
   sessionStats = { pace, topUps: 0, cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
@@ -442,6 +455,7 @@ function setMascot(el, mood) {
 
 function clearTimers() {
   if (card) card.timers.forEach(clearTimeout);
+  hideNudge();
 }
 
 function showCard() {
@@ -458,7 +472,7 @@ function showCard() {
   const level = levelOf(word);
   card = { word, level, shown: new Set(), start: performance.now(), timers: [] };
   // Which card: Bubble Pop while Learning, reading in the middle, Build It once hatched.
-  card.kind = mode === 'meet' ? 'read' : cardKind(state.words[word]);
+  card.kind = mode === 'meet' ? 'read' : cardKind(state.words[word], Math.random, word);
   clearTask();
   $('task').hidden = $('task-bar').hidden = true;
   $('card').hidden = false;
@@ -475,18 +489,37 @@ function showCard() {
   if (mode === 'learn') {
     // A word she has never seen is modelled first, not tested (introduce()).
     if (needsIntro(state.words[word])) { introduce(word); return; }
-    // Help follows the word's level, stepped up right after a miss (engine supportLevel).
-    const support = supportLevel(state.words[word]);
-    const plan = CONFIG.hints[support] || {};
-    for (const [kind, at] of Object.entries(plan)) {
-      card.timers.push(setTimeout(() => showHint(kind, support === 3 && kind === 'sparkle'), at));
-    }
+    armNudge();
   }
 }
+
+// No automatic hints (owner, 2026-11-01): after CONFIG.hintNudgeMs without a touch on a reading
+// card, a hand points at Hint instead. Any touch hides it and restarts the clock.
+let nudgeTimer = null, nudgeHand = null;
+function hideNudge() { clearTimeout(nudgeTimer); nudgeTimer = null; nudgeHand?.remove(); nudgeHand = null; }
+function armNudge() {
+  hideNudge();
+  if (!card || card.kind !== 'read' || card.intro || mode !== 'learn' || $('btn-hint').disabled) return;
+  const c = card;
+  nudgeTimer = setTimeout(() => {
+    nudgeTimer = null;
+    if (card !== c || card.intro || busy || $('play-screen').hidden) return;
+    const r = $('btn-hint').getBoundingClientRect();
+    nudgeHand = document.createElement('span');
+    nudgeHand.className = 'nudge-hand';
+    nudgeHand.setAttribute('aria-hidden', 'true');
+    nudgeHand.innerHTML = img(art('ui-hand'));
+    nudgeHand.style.left = `${r.left + r.width / 2 - 28}px`;
+    nudgeHand.style.top = `${r.top - 62}px`;
+    document.body.appendChild(nudgeHand);
+  }, CONFIG.hintNudgeMs);
+}
+window.addEventListener('pointerdown', () => { if (nudgeTimer || nudgeHand) armNudge(); }, true);
 
 function showHint(kind, faint = false) {
   if (!card) return;
   card.shown.add(kind);
+  card.hintAt ??= performance.now();
   if (kind === 'sparkle') {
     const f = $('word').querySelector('.first');
     f.classList.add('sparkle');
@@ -530,7 +563,7 @@ function showTask(c) {
   $('parent-strip').hidden = true;
   setMascot($('play-mascot'), 'think');
   audio.chime.pop();
-  const onDone = firstTry => taskDone(c, firstTry);
+  const onDone = (firstTry, picked) => taskDone(c, firstTry, picked);
   if (kind === 'pop') popCard({ word, entries: entries(), show, count: bubbleCount(state.words[word]), onDone, onWrong: () => setMascot($('play-mascot'), 'gentle') });
   else buildCard({ word, show, onDone });
   // How-to once per game, then the word. Waits for the greeting instead of cutting it off.
@@ -549,14 +582,14 @@ $('task-hear').addEventListener('click', () => { if (card) audio.say(wordId(card
 
 // A Bubble Pop or Build It card is finished. A first-try pop is progress (2 in a row leave
 // Learning); a pop after a wrong bubble is a miss, and the word comes back later like a Not yet.
-function taskDone(c, firstTry) {
+function taskDone(c, firstTry, picked) {
   if (card !== c || busy) return;
   busy = true;
   const { word, kind } = c;
   pushUndo(word);
   const rec = record(state, word);
   const stepBefore = hatchProgress(rec, Date.now()).step;
-  const res = kind === 'pop' ? applyPop(rec, firstTry, Date.now()) : applyBuild(rec, firstTry, Date.now());
+  const res = kind === 'pop' ? applyPop(rec, firstTry, Date.now(), picked) : applyBuild(rec, firstTry, Date.now());
   const missed = kind === 'pop' && !firstTry;
   session.answer(missed ? 'notyet' : 'got');
   if (missed && session.missCount[word] >= CONFIG.restAfterMisses) {
@@ -566,7 +599,7 @@ function taskDone(c, firstTry) {
   sessionStats.cards++;
   persist();
   if (missed) {
-    // No cheer, no fuss: hear the word once more while its bubble pops, then on to an easy card.
+    // No cheer, no fuss: hear the word while its bubble glows, then on to an easy card.
     const s = session, token = ++celebrationToken;
     audio.say(wordId(word), word).then(() => setTimeout(() => {
       if (session !== s || token !== celebrationToken) return;
@@ -606,7 +639,10 @@ function answer(result) {
   clearTimers();
   audio.chime.tap();
   const { word } = card;
-  const hinted = card.shown.size > 0;
+  // A hint only counts once it has been up a moment: an answer within CONFIG.hintGraceMs of the
+  // first hint was already on its way (owner, 2026-11-01; her data showed reads at 3.6-4 s turned
+  // into Got it by a hint that appeared at 3 s). Say it always counts: hearing the word isn't reading it.
+  const hinted = card.shown.has('say') || (card.shown.size > 0 && performance.now() - card.hintAt >= CONFIG.hintGraceMs);
   const ms = performance.now() - card.start;
   const rec = record(state, word);
   pushUndo(word);
@@ -718,7 +754,7 @@ function showEggInfo(word) {
   $('egg-info-pic').className = 'egg-pop-pic' + (lvl ? ' wobble' + Math.max(1, eggStage(lvl)) : '');
   $('egg-info-word').textContent = show(word);
   renderDots($('egg-info-dots'), hatchProgress(rec, Date.now()));
-  $('egg-info-next').textContent = nextStep(rec, Date.now());
+  $('egg-info-next').innerHTML = stepHtml(rec, Date.now());
   $('egg-info').hidden = false;
   audio.chime.twinkle();
   if (rec?.seen) audio.say(wordId(word), word);
@@ -834,7 +870,7 @@ async function teach(word) {
   if (still()) await pause(300);
   const entry = wordEntry(word);
   if (still() && entry) await readSentence(word, { cloze: false });
-  await yourTurn(still);
+  await yourTurn(still, { lock: false });
 }
 
 // Reads the card's sentence, lighting up each word as it's spoken. cloze: the voice stops where
@@ -898,19 +934,19 @@ async function sayHighlighted(id, text, spans) {
   spans.forEach(s => s.classList.remove('now'));
 }
 
-// Her turn to say it: a quiet pause with a little ear on the card, and Next / the answer buttons
-// stay locked so the next line can't talk over her (owner, 2026-10-28).
-async function yourTurn(still) {
+// Her turn to say it: a quiet pause with a little ear on the card. On a scored card the answer
+// buttons stay locked so the next line can't talk over her (owner, 2026-10-28); on a teaching card
+// Next stays tappable, and tapping it ends the pause (owner, 2026-11-01).
+async function yourTurn(still, { lock = true } = {}) {
   if (!still()) return;
-  lockHolds++;
-  applyLock();
+  if (lock) { lockHolds++; applyLock(); }
   $('card').classList.add('listening');
   try {
-    await new Promise(r => setTimeout(r, CONFIG.yourTurnMs));
+    const end = Date.now() + CONFIG.yourTurnMs;
+    while (Date.now() < end && (lock || still())) await new Promise(r => setTimeout(r, Math.min(100, end - Date.now())));
   } finally {
     $('card').classList.remove('listening');
-    lockHolds--;
-    applyLock();
+    if (lock) { lockHolds--; applyLock(); }
   }
 }
 
@@ -949,7 +985,7 @@ async function introduce(word) {
   const entry = wordEntry(word);
   if (still() && entry) await readSentence(word, { cloze: false });
   if (still()) await audio.say('your-turn', 'Your turn! Can you say it?');
-  await yourTurn(still);
+  await yourTurn(still, { lock: false });
 }
 $('next').addEventListener('click', () => {
   audio.stop();
@@ -1128,7 +1164,7 @@ function renderSettings() {
   $('fs-note').textContent = device.isInstalled() && !device.fullscreenSupported() ? 'Opened from the home screen icon, so it\'s already full screen.'
     : !device.fullscreenSupported() ? 'This browser can\'t go full screen. On iPhone: Share → Add to Home Screen, then open it from the icon.'
     : device.isInstalled() ? 'Opened from the home screen icon, so it\'s already full screen.'
-    : s.fullscreen && !device.isFullscreen() ? 'Full screen was left (Back or a swipe). Tap Play or ⛶ to return.' : '';
+    : s.fullscreen && !device.isFullscreen() ? 'Full screen was left (Back or a swipe). Tap Play or the full-screen button to return.' : '';
   $('set-wake').checked = s.wakeLock;
   $('wake-note').textContent = device.wakeLockSupported() ? ''
     : 'Not available at this address (needs https). The screen may dim during a game.';
@@ -1263,12 +1299,13 @@ function renderProgress() {
     const card = document.createElement('button');
     card.className = 'word-report';
     const reading = st.reads ? `${st.reads} · ${pctText(st.readRight)} right · ${pctText(st.readFast)} fast${st.avgSec !== null ? ` · avg ${st.avgSec.toFixed(1)} s` : ''}` : 'not yet';
-    const pop = st.pops ? `${st.pops} · ${pctText(st.popFirst)} first try` : '—';
-    const build = level < 4 ? 'after hatching' : st.built ? `built ✓ (${st.builds} tr${st.builds === 1 ? 'y' : 'ies'})` : st.builds ? `not yet · ${st.builds} tr${st.builds === 1 ? 'y' : 'ies'}` : 'not tried yet';
+    const mixed = Object.entries(st.popMixups).sort((a, b) => b[1] - a[1]).map(([x, n]) => `${show(x)}${n > 1 ? ` ×${n}` : ''}`).join(', ');
+    const pop = st.pops ? `${st.pops} · ${pctText(st.popFirst)} right${mixed ? ` · picked ${mixed} instead` : ''}` : '—';
+    const build = !spellable(w) ? 'one letter: nothing to spell' : level < 4 ? 'after hatching' : st.built ? `built ✓ (${st.builds} tr${st.builds === 1 ? 'y' : 'ies'})` : st.builds ? `not yet · ${st.builds} tr${st.builds === 1 ? 'y' : 'ies'}` : 'not tried yet';
     const check = st.checks ? `${st.checkRight} of ${st.checks} right${st.lastCheckRight === false ? ' (missed last time)' : ''}` : '—';
     card.innerHTML = `
       <div class="wr-head"><b>${show(w)}</b>${r?.headStart ? ' <span class="wr-tag">head start</span>' : ''}<span class="lvl lv${level}">${LEVEL_NAMES[level]}</span><span class="egg-dots small"></span></div>
-      <div class="wr-next">${nextStep(r, now)}</div>
+      <div class="wr-next">${stepHtml(r, now)}</div>
       <dl>
         <dt>Reading</dt><dd>${reading}</dd>
         <dt>Bubble Pop</dt><dd>${pop}</dd>
@@ -1318,6 +1355,6 @@ if (art('sticker-book')) $('sticker-screen').classList.add('felt-book');
 if ('serviceWorker' in navigator && window.isSecureContext && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-initCheck({ state: () => state, persist, go, show, entries, setMascot, burst });
+initCheck({ state: () => state, persist, go, show, entries, setMascot, burst, art });
 doSync(true);
 window.__sightwords = { get state() { return state; }, cardWord: () => (card ? show(card.word) : null), cardKind: () => card?.kind, answered: () => session?.results.length ?? 1e9, pets: petState, toys: toyState, playAll, checkWord, words: () => entries().map(e => e.word) }; // for the smoke test

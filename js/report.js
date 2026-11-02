@@ -26,6 +26,7 @@ export function wordStats(rec, word, checks = []) {
     avgSec: times.length ? times.reduce((a, b) => a + b, 0) / times.length / 1000 : null,
     pops: pops.length,
     popFirst: pct(pops.filter(x => x.r === 'pop').length, pops.length),
+    popMixups: pops.reduce((m, x) => (x.x ? { ...m, [x.x]: (m[x.x] || 0) + 1 } : m), {}),
     builds: builds.length,
     buildFirst: pct(builds.filter(x => x.r === 'build').length, builds.length),
     built: Boolean(rec?.built),

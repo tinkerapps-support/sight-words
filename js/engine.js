@@ -16,11 +16,13 @@ function startOfNextDay(now) {
   return d.getTime();
 }
 
-export function newRecord() {
+// A one-letter word ("a", "I") has nothing to spell, so it starts built (owner, 2026-11-01).
+export const spellable = word => [...String(word ?? 'xx')].length > 1;
+export function newRecord(word) {
   return {
     level: 0, correctStreak: 0, fastStreak: 0, levelDay: null, levelSince: null,
     reviewIdx: 0, seen: 0, misses: 0, lastSeen: 0, nextDue: 0, headStart: false, history: [],
-    restUntil: 0, popStreak: 0, built: false,
+    restUntil: 0, popStreak: 0, built: !spellable(word),
   };
 }
 
@@ -73,7 +75,7 @@ export function nextStep(rec, now) {
   if (rec.level === 1) return rec.popStreak >= 1 ? 'Next: one more first-try bubble pop' : 'Next: pop its bubble on the first try, twice in a row';
   if (rec.level === 2) return rec.fastStreak >= 1 ? 'Next: one more Fast read' : 'Next: 2 Fast reads in a row';
   if (rec.level === 3) {
-    return dayKey(now) === rec.levelDay ? 'Next: a Fast read tomorrow hatches it 🌙' : 'Next: a Fast read hatches it!';
+    return dayKey(now) === rec.levelDay ? 'Next: a Fast read tomorrow hatches it' : 'Next: a Fast read hatches it!';
   }
   if (rec.level === 4) {
     if (!rec.built) return 'Hatched! Next: build (spell) it right on the first try';
@@ -82,7 +84,7 @@ export function nextStep(rec, now) {
     const day = new Date(crownAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     return `Hatched! A Fast read from ${day} earns the crown`;
   }
-  return 'Mastered 👑';
+  return 'Mastered';
 }
 
 // Missed CONFIG.restAfterMisses times in one game: rest it until tomorrow so a hard word
@@ -154,12 +156,14 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
 // (hearing it and finding it is the first step), reading while it's Getting it / Almost, and Build It
 // (spelling, the step beyond reading) once it has hatched: 80% Build It / 20% reading until it's
 // built right on the first try, then 40% Build It / 20% Bubble Pop (variety) / 40% reading
-// (CONFIG.buildShare*, popShareBuilt; owner, 2026-10-27).
-export function cardKind(rec, rng = Math.random) {
+// (CONFIG.buildShare*, popShareBuilt; owner, 2026-10-27). A one-letter word is never spelled: its
+// Build It share goes to reading.
+export function cardKind(rec, rng = Math.random, word) {
   if (needsIntro(rec)) return 'intro';
   if (rec.level <= 1) return 'pop';
   if (rec.level <= 3) return 'read';
   const r = rng();
+  if (!spellable(word)) return r < CONFIG.popShareBuilt ? 'pop' : 'read';
   if (!rec.built) return r < CONFIG.buildShareUnbuilt ? 'build' : 'read';
   if (r < CONFIG.buildShareBuilt) return 'build';
   return r < CONFIG.buildShareBuilt + CONFIG.popShareBuilt ? 'pop' : 'read';
@@ -183,11 +187,12 @@ function log(rec, entry) {
 // A Bubble Pop card. firstTry: she popped the right bubble before any wrong one.
 // CONFIG.popsToLearn first-try pops in a row move a Learning word to Getting it (required:
 // it's the only way out of Learning). A wrong first pop is a miss: the streak starts over.
-export function applyPop(rec, firstTry, now) {
+// picked: the wrong bubble she popped (x in the history), so mix-ups like it/is show in the report.
+export function applyPop(rec, firstTry, now, picked) {
   const before = rec.level;
   rec.seen++;
   rec.lastSeen = now;
-  log(rec, { t: now, r: firstTry ? 'pop' : 'popmiss', ms: 0, h: 0 });
+  log(rec, { t: now, r: firstTry ? 'pop' : 'popmiss', ms: 0, h: 0, ...(!firstTry && picked ? { x: picked } : {}) });
   if (rec.level === 0) setLevel(rec, 1, now);
   if (!firstTry) {
     rec.misses++;
@@ -254,7 +259,7 @@ const GOOD = new Set(['fast', 'pop', 'build']);          // Fast read, first-try
 const OK = new Set(['got', 'buildhelp']);
 const BAD = new Set(['notyet', 'popmiss']);
 
-// -1 slow, 0 normal, 1 quick, 2 fast, from her newest scored cards across every word.
+// -1 slow, 0 normal, 1 quick, 2 fast, 3 flying, from her newest scored cards across every word.
 export function paceLevel(records, now) {
   const P = CONFIG.pace;
   const since = now - 14 * DAY;
@@ -265,10 +270,11 @@ export function paceLevel(records, now) {
   const good = recent.filter(h => GOOD.has(h.r)).length / recent.length;
   const right = recent.filter(h => !BAD.has(h.r)).length / recent.length;
   if (right < P.slowBelow) return -1;
+  if (right >= P.flyingAt && good >= P.flyingStrong) return 3;
   if (right >= P.fastAt && good >= P.fastStrong) return 2;
   return right >= P.quickAt ? 1 : 0;
 }
-export const PACE_NAMES = { '-1': 'gentle (new words wait until current ones settle)', 0: 'normal', 1: 'quick (extra new words)', 2: 'fast (lots of new words)' };
+export const PACE_NAMES = { '-1': 'gentle (new words wait until current ones settle)', 0: 'normal', 1: 'quick (extra new words)', 2: 'fast (lots of new words, fewer review cards)', 3: 'flying (new words take turns, few review cards)' };
 
 // The next brand-new word to bring in mid-game (list order), or null.
 export function nextFreshWord(records, entries, exclude = new Set()) {
@@ -282,7 +288,7 @@ export function nextFreshWord(records, entries, exclude = new Set()) {
 // The last card of `queue` is always the surest word available.
 export function buildSession({ records, entries, now, length, rng = Math.random, pace = 0 }) {
   const P = CONFIG.pace.levels[pace] || CONFIG.pace.levels[0];
-  const rec = w => records[w] || newRecord();
+  const rec = w => records[w] || newRecord(w);
   const level = w => rec(w).level;
   const words = entries.map(e => e.word);
   const known = words.filter(w => level(w) >= 3);
@@ -303,8 +309,11 @@ export function buildSession({ records, entries, now, length, rng = Math.random,
   for (let room = maxShaky - allShaky.length; room > 0 && fresh.length; room--) shaky.push(fresh.shift());
 
   const nTargets = starterMode ? CONFIG.starterTargets : P.targets;
+  // Fast / flying shows only the targets, so words she has started come before brand-new ones.
+  const drill = P.knownEvery && !starterMode;
+  const started = w => (drill && rec(w).seen > 0 ? 1 : 0);
   const targets = [...shaky]
-    .sort((a, b) => rec(b).misses - rec(a).misses || rec(a).lastSeen - rec(b).lastSeen)
+    .sort((a, b) => started(b) - started(a) || rec(b).misses - rec(a).misses || rec(a).lastSeen - rec(b).lastSeen)
     .slice(0, nTargets);
 
   // Filler ("known") pool: due reviews first, then least recently seen.
@@ -327,62 +336,91 @@ export function buildSession({ records, entries, now, length, rng = Math.random,
     return lookalikesOf(a, entries).has(b);
   };
 
-  // Steps per target: as many as fit (T,K1 = 1 step; T,K1,T,K1,K2 = 2; …).
-  const blockSize = s => s + (s * (s + 1)) / 2;
-  let steps = CONFIG.irSteps;
-  while (steps > 1 && targets.length * blockSize(steps) > budget) steps--;
-
-  let cursor = 0;
-  const blocks = targets.map(t => {
-    const allowed = pool.filter(w => !clash(w, t));
-    const picks = [];
-    for (let i = 0; i < allowed.length && picks.length < steps; i++) {
-      picks.push(allowed[(cursor + i) % allowed.length]);
-    }
-    cursor += picks.length;
-    const block = [];
-    for (let s = 1; s <= steps; s++) {
-      block.push(t);
-      block.push(...picks.slice(0, s));
-    }
-    return block;
-  });
-
-  let queue = blocks.flat().slice(0, budget);
-
-  // Fill what's left: a look-alike contrast pair, due reviews, other shaky words, then anything known.
-  const used = new Set(queue);
-  const fill = [];
-  const room = () => budget - queue.length - fill.length;
-  const pair = contrastPair(entries, rec);
-  if (pair && room() >= 2 && !used.has(pair[0]) && !used.has(pair[1])) {
-    fill.push(...pair);
-    pair.forEach(w => used.add(w));
-  }
-  const candidates = [
-    ...pool.filter(w => rec(w).nextDue <= now),
-    ...shaky.filter(w => !targets.includes(w)),
-    ...pool,
-  ];
-  for (const w of candidates) {
-    if (room() <= 0) break;
-    if (!used.has(w)) { fill.push(w); used.add(w); }
-  }
-  // Still room (tiny lists): repeat targets and the pool.
-  const cycle = [...targets, ...pool];
-  for (let i = 0; room() > 0 && cycle.length && i < 100; i++) fill.push(cycle[i % cycle.length]);
-
-  if (blocks.length > 1) {
-    const half = Math.ceil(fill.length / 2);
-    queue = [...blocks[0], ...fill.slice(0, half), ...blocks.slice(1).flat(), ...fill.slice(half)].slice(0, budget);
+  let queue;
+  if (drill && targets.length > 1) {
+    // Fast / flying: the targets take turns, so each gets 3–5 cards a game instead of 1–2.
+    queue = drillQueue(targets, pool.filter(w => !targets.includes(w)), budget, P.knownEvery, clash);
   } else {
-    queue = [...queue, ...fill];
+    // Steps per target: as many as fit (T,K1 = 1 step; T,K1,T,K1,K2 = 2; …).
+    const blockSize = s => s + (s * (s + 1)) / 2;
+    let steps = CONFIG.irSteps;
+    while (steps > 1 && targets.length * blockSize(steps) > budget) steps--;
+
+    let cursor = 0;
+    const blocks = targets.map(t => {
+      const allowed = pool.filter(w => !clash(w, t));
+      const picks = [];
+      for (let i = 0; i < allowed.length && picks.length < steps; i++) {
+        picks.push(allowed[(cursor + i) % allowed.length]);
+      }
+      cursor += picks.length;
+      const block = [];
+      for (let s = 1; s <= steps; s++) {
+        block.push(t);
+        block.push(...picks.slice(0, s));
+      }
+      return block;
+    });
+
+    queue = blocks.flat().slice(0, budget);
+
+    // Fill what's left: a look-alike contrast pair, due reviews, other shaky words, then anything known.
+    const used = new Set(queue);
+    const fill = [];
+    const room = () => budget - queue.length - fill.length;
+    const pair = contrastPair(entries, rec);
+    if (pair && room() >= 2 && !used.has(pair[0]) && !used.has(pair[1])) {
+      fill.push(...pair);
+      pair.forEach(w => used.add(w));
+    }
+    const candidates = [
+      ...pool.filter(w => rec(w).nextDue <= now),
+      ...shaky.filter(w => !targets.includes(w)),
+      ...pool,
+    ];
+    for (const w of candidates) {
+      if (room() <= 0) break;
+      if (!used.has(w)) { fill.push(w); used.add(w); }
+    }
+    // Still room (tiny lists): repeat targets and the pool.
+    const cycle = [...targets, ...pool];
+    for (let i = 0; room() > 0 && cycle.length && i < 100; i++) fill.push(cycle[i % cycle.length]);
+
+    if (blocks.length > 1) {
+      const half = Math.ceil(fill.length / 2);
+      queue = [...blocks[0], ...fill.slice(0, half), ...blocks.slice(1).flat(), ...fill.slice(half)].slice(0, budget);
+    } else {
+      queue = [...queue, ...fill];
+    }
   }
   queue = repairAdjacency(queue, clash);
 
   const end = endingCard(words, rec, queue[queue.length - 1], clash);
   if (end) queue.push(end);
   return { queue, targets, starterMode, clash };
+}
+
+// Fast pace (she's getting every card right, owner 2026-10-30): the old rehearsal blocks
+// (T,K1 · T,K1,K2 …) are two-thirds known words, and three of them don't fit in one game, so each
+// target got a single card. Here targets take turns (T1,T2,K,T3,T1,K …) with one known word
+// (due reviews first) after every `knownEvery` target cards, never a look-alike of its neighbours.
+function drillQueue(targets, pool, budget, knownEvery, clash) {
+  const q = [];
+  let t = 0, k = 0, run = 0;
+  while (q.length < budget) {
+    if (run >= knownEvery && pool.length) {
+      const prev = q[q.length - 1], next = targets[t % targets.length];
+      let i = 0;
+      while (i < pool.length - 1 && (clash(pool[(k + i) % pool.length], prev) || clash(pool[(k + i) % pool.length], next))) i++;
+      q.push(pool[(k + i) % pool.length]);
+      k += i + 1;
+      run = 0;
+    } else {
+      q.push(targets[t++ % targets.length]);
+      run++;
+    }
+  }
+  return q;
 }
 
 // Two look-alikes that are both level 3+, shown side by side on purpose.

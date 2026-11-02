@@ -25,13 +25,18 @@ export const CONFIG = {
     quickAt: 0.85,           // share right at or above this: a bit faster
     fastAt: 0.92,            // …and this, with fastStrong of cards Fast / first try: fastest
     fastStrong: 0.7,
-    // per pace (-1 slow, 0 normal, 1 quick, 2 fast): shaky-word cap, targets per game, and how
-    // many new words may join mid-game when a word graduates to Almost.
+    flyingAt: 0.96,          // share right at or above this (at most 1 miss in 24), with
+    flyingStrong: 0.8,       // flyingStrong of cards Fast / first try: flying (owner, 2026-10-30)
+    // per pace (-1 slow, 0 normal, 1 quick, 2 fast, 3 flying): shaky-word cap, targets per game, and
+    // how many new words may join mid-game when a word graduates to Almost. knownEvery (fast and
+    // flying): targets take turns with each other, with one known word after every knownEvery target
+    // cards, instead of the known-heavy rehearsal blocks.
     levels: {
       '-1': { maxShaky: 2, targets: 1, topUps: 0 },
       0: { maxShaky: 3, targets: 2, topUps: 0 },
       1: { maxShaky: 4, targets: 2, topUps: 1 },
-      2: { maxShaky: 6, targets: 3, topUps: 2 },
+      2: { maxShaky: 6, targets: 3, topUps: 2, knownEvery: 2 },
+      3: { maxShaky: 8, targets: 3, topUps: 3, knownEvery: 3 },
     },
   },
   check: { grid: 10 },
@@ -42,13 +47,10 @@ export const CONFIG = {
   buildShareUnbuilt: 0.8,    // hatched word not yet built right: share of its cards that are Build It
   buildShareBuilt: 0.4,      // after it's built right once: Build It…
   popShareBuilt: 0.2,        // …Bubble Pop for variety, and the rest (40%) reading
-  // Automatic hints by level: when each one appears (ms after the card shows).
-  // Slowed down 2026-10-28 (owner: "a little too quickly"); was 0/3 s, 3/6 s, 6 s.
-  hints: {
-    1: { sparkle: 3000, sentence: 6000 },
-    2: { sparkle: 5000, sentence: 9000 },
-    3: { sparkle: 9000 },
-  },
+  // No automatic hints (owner, 2026-11-01; they used to appear 3-9 s in by level): after this
+  // long without a touch on a reading card, a hand points at the Hint button instead.
+  hintNudgeMs: 10000,
+  hintGraceMs: 2000,         // a Fast within this long of the first hint still counts as Fast
 };
 
 export const LEVEL_NAMES = ['New', 'Learning', 'Getting it', 'Almost', 'Known', 'Mastered'];

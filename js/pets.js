@@ -399,7 +399,7 @@ function showPresent(kind) {
   const el = document.createElement('div');
   el.className = 'toy present';
   const art = opts.art('toy-present');
-  el.innerHTML = art ? `<img src="${art}" alt="" draggable="false">` : '<span>🎁</span>';
+  el.innerHTML = art ? `<img src="${art}" alt="" draggable="false">` : '<span class="present-box"></span>';
   const [fx, fy] = HOME[kind];
   const x = Math.min(layer.clientWidth - 84, fx * layer.clientWidth), y = Math.min(layer.clientHeight - 84, fy * layer.clientHeight);
   el.style.transform = `translate(${x}px, ${y}px)`;

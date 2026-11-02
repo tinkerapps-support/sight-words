@@ -120,7 +120,7 @@ function fadeTo(level, secs = 0.6) {
 }
 
 export function start() {
-  if (!enabled || playing || document.hidden) return;
+  if (!enabled || playing || !onScreen()) return;
   const ctx = ensureBus();
   if (!ctx) return;
   playing = true;
@@ -147,6 +147,16 @@ export function duck(on) {
   if (playing) fadeTo(on ? DUCKED : LEVEL, on ? 0.15 : 0.8);
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stop(); else start();
-});
+// Only play while the page is on screen and in front. Music once started in a pocket on a locked
+// phone (owner, 2026-11-01): Android can report the page visible for a moment when the lock screen
+// lights up, so a return waits a second and checks again before the music comes back.
+const onScreen = () => document.visibilityState === 'visible' && document.hasFocus();
+let returnTimer = null;
+function follow() {
+  clearTimeout(returnTimer);
+  if (!onScreen()) { stop(); return; }
+  returnTimer = setTimeout(() => { if (onScreen()) start(); }, 1000);
+}
+for (const ev of ['visibilitychange', 'pagehide', 'pageshow', 'freeze', 'resume']) document.addEventListener(ev, follow);
+window.addEventListener('blur', follow);
+window.addEventListener('focus', follow);

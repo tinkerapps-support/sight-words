@@ -89,7 +89,7 @@ button:disabled { opacity: 0.35; cursor: default; }
   position: relative;
 }
 .friend.hatched { background: rgba(255,255,255,0.9); box-shadow: 0 2px 6px rgba(90,58,94,0.12); }
-.friend.mastered::after { content: '👑'; position: absolute; top: -10px; font-size: 1rem; }
+.friend.mastered::after { content: ''; width: 22px; height: 22px; background: url('../assets/art/ui-crown.webp') center / contain no-repeat; position: absolute; top: -12px; }
 .friend .egg { width: 52%; aspect-ratio: 0.78; border-radius: 50% 50% 48% 48% / 60% 60% 40% 40%; background: #fff; box-shadow: inset -4px -4px 0 rgba(201,182,255,0.5); }
 .friend .egg.s1 { animation: wobble 3s ease-in-out infinite; }
 .friend .egg.s2 { background: radial-gradient(circle at 30% 35%, var(--r1) 8%, transparent 9%), radial-gradient(circle at 65% 60%, var(--r5) 8%, transparent 9%), radial-gradient(circle at 40% 75%, var(--r3) 7%, transparent 8%), #fff; animation: wobble 2s ease-in-out infinite; }
@@ -210,7 +210,7 @@ button:disabled { opacity: 0.35; cursor: default; }
   font-family: 'Andika', sans-serif; font-size: 1.5rem; font-weight: 700;
 }
 .chip.on { background: #fff0c2; box-shadow: inset 0 0 0 3px #f0b400; }
-.chip.on::before { content: '⭐'; position: absolute; top: -8px; right: -6px; font-size: 0.9rem; }
+.chip.on::before { content: ''; position: absolute; top: -8px; right: -6px; width: 18px; height: 18px; background: url('../assets/art/ui-star.webp') center / contain no-repeat; }
 .chip .dot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; }
 .lv0 { background: #d8d0dc; } .lv1 { background: #ff9ac4; } .lv2 { background: #ffbf8f; }
 .lv3 { background: #ffe08a; } .lv4 { background: #9fe3c4; } .lv5 { background: #6cc79c; }
@@ -296,7 +296,7 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .egg-pop-pic.grow > * { animation: egg-grow 0.5s ease-out; }
 @keyframes egg-grow { 0% { transform: scale(1); filter: brightness(1.6); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
 .egg-pop-pic.friend-bounce > * { animation: hop 0.5s ease-out 2; }
-.egg-pop-pic.crowned::after { content: '👑'; position: absolute; top: -14px; font-size: 1.6rem; }
+.egg-pop-pic.crowned::after { content: ''; width: 38px; height: 38px; background: url('../assets/art/ui-crown.webp') center / contain no-repeat; position: absolute; top: -20px; }
 .egg-dots { display: flex; gap: 8px; }
 .egg-dots i { width: 16px; height: 16px; border-radius: 50%; background: #eadff0; box-shadow: inset 0 0 0 2px #fff; }
 .egg-dots i.on { background: var(--pink); }
@@ -386,8 +386,10 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .word .ltr.lit { color: var(--pink-deep); transform: translateY(-6px) scale(1.12); }
 .card { position: relative; }
 .card.intro::before {
-  content: '✨ new word ✨'; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-  background: var(--r3); color: var(--ink); font-weight: 700; padding: 4px 14px; border-radius: 999px; font-size: 1.1rem;
+  content: 'new word'; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: var(--r3); color: var(--ink); font-weight: 700; padding: 4px 40px; border-radius: 999px; font-size: 1.1rem;
+  background-image: url('../assets/art/fx-sparkle.webp'), url('../assets/art/fx-sparkle.webp');
+  background-size: 22px 22px; background-repeat: no-repeat; background-position: left 12px center, right 12px center;
 }
 .hatch .burst span { animation-duration: 1.3s; }
 
@@ -443,7 +445,9 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 }
 .bubble.popped { animation: bubble-pop 0.35s ease-out forwards; }
 .bubble.nope { animation: nudge 0.45s; opacity: 0.35; }
-.bubble:disabled { cursor: default; }
+.bubble.reveal { animation: gap-pulse 0.9s ease-in-out infinite; box-shadow: 0 0 0 5px #ffe08a, 0 0 22px rgba(255,224,138,0.9); }
+.bubble:disabled { cursor: default; opacity: 1; }
+.bubble.nope, #pop-area:has(.reveal) .bubble:not(.reveal) { opacity: 0.35; }
 @keyframes bubble-in { from { transform: translateY(60vh) scale(0.6); opacity: 0; } }
 @keyframes bubble-float { 50% { transform: translateY(-14px); } }
 @keyframes bubble-pop { 60% { transform: scale(1.25); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
@@ -502,7 +506,7 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .pet.held { z-index: 9999 !important; cursor: grabbing; }
 .pet.held .pet-body { animation: pet-held 0.3s ease-in-out infinite; }
 .pet.held .pet-shadow { transform: translateY(14px) scale(0.6); opacity: 0.5; }
-.pet.crowned::after { content: '👑'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 1.1rem; pointer-events: none; }
+.pet.crowned::after { content: ''; width: 26px; height: 26px; background: url('../assets/art/ui-crown.webp') center / contain no-repeat; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); pointer-events: none; }
 @keyframes pet-walk { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
 @keyframes pet-hop { 15% { transform: scale(1.15, 0.85); } 45% { transform: translateY(-34px) scale(0.92, 1.1); } 75% { transform: translateY(0) scale(1.12, 0.88); } 100% { transform: none; } }
 @keyframes pet-cheer { 30% { transform: translateY(-14px) rotate(-6deg); } 60% { transform: translateY(0) rotate(4deg); } 100% { transform: none; } }
@@ -542,6 +546,7 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .check-word.wrong { opacity: 0.45; animation: nudge 0.45s; }
 .check-word.reveal { background: var(--pink-soft); color: var(--pink-deep); box-shadow: 0 0 0 4px var(--pink); }
 .check-stars { font-size: 2.6rem; letter-spacing: 6px; }
+.check-stars img { height: 56px; width: auto; margin: 0 3px; vertical-align: middle; }
 .check-missed { font-family: system-ui, sans-serif; color: var(--ink-soft); line-height: 1.5; text-align: center; }
 .check-missed span { display: inline-block; margin: 2px 4px; padding: 0 8px; border-radius: 8px; background: #fff; font-family: 'Andika', sans-serif; font-size: 1.2rem; color: var(--ink); }
 #check-result { margin: auto 0; }
@@ -671,7 +676,7 @@ input, textarea, select, .sync-code { -webkit-user-select: text; user-select: te
 .toy-confetti img { width: 100%; height: 100%; object-fit: contain; }
 
 /* Her turn to say it back: a little ear on the card while the app stays quiet */
-.card.listening::after { content: '👂'; position: absolute; top: 10px; right: 14px; font-size: 2rem; animation: listen 1s ease-in-out infinite; }
+.card.listening::after { content: ''; width: 40px; height: 40px; background: url('../assets/art/ui-ear.webp') center / contain no-repeat; position: absolute; top: 10px; right: 14px; animation: listen 1s ease-in-out infinite; }
 @keyframes listen { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.2); opacity: 1; } }
 
 /* Sync conflict chooser */
@@ -681,3 +686,9 @@ input, textarea, select, .sync-code { -webkit-user-select: text; user-select: te
 .sync-choice b { display: block; color: var(--ink); }
 .sync-choice span { font-size: 0.85rem; color: var(--ink-soft); }
 .sync-choice.on { border-color: var(--pink-deep); background: var(--pink-soft); }
+
+/* Idle hand over the Hint button (main.js armNudge) */
+.nudge-hand { position: fixed; z-index: 60; width: 56px; height: 56px; pointer-events: none; animation: nudge-point 1.1s ease-in-out infinite; filter: drop-shadow(0 3px 4px #51395f55); }
+.nudge-hand img { width: 100%; height: 100%; display: block; }
+@keyframes nudge-point { 50% { transform: translateY(10px); } }
+.step-icon { height: 1.2em; width: auto; vertical-align: -0.25em; }

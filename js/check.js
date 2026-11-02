@@ -15,7 +15,7 @@ const shuffle = arr => {
 };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-let ctx = null;    // from main.js: { state, persist, go, show, entries, setMascot, burst }
+let ctx = null;    // from main.js: { state, persist, go, show, entries, setMascot, burst, art }
 let run = null;    // { words, i, right, missed, token }
 
 export function initCheck(context) {
@@ -120,7 +120,8 @@ function finish() {
   $('check-result').hidden = false;
   $('check-score').textContent = `You got ${right} of ${total}!`;
   const stars = right === total ? 3 : right / total >= 0.8 ? 2 : 1;
-  $('check-stars').textContent = '⭐'.repeat(stars);
+  const star = ctx.art('ui-star');
+  $('check-stars').innerHTML = (star ? `<img src="${star}" alt="" draggable="false">` : '⭐').repeat(stars);
   $('check-missed').innerHTML = missed.length
     ? `<b>For the grown-up:</b> words to practice: ${missed.map(w => `<span>${ctx.show(w)}</span>`).join(' ')}`
     : '<b>For the grown-up:</b> every word right on the first try!';

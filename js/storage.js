@@ -1,5 +1,5 @@
 // Saved progress (localStorage) plus backup export/import (PLAN.md §7, §9).
-import { newRecord } from './engine.js';
+import { newRecord, spellable } from './engine.js';
 import { CONFIG } from './config.js';
 import { LISTS } from './lists.js';
 
@@ -41,7 +41,8 @@ export function normalize(raw) {
       delete state.words[w];
       continue;
     }
-    state.words[w] = { ...newRecord(), ...rec, history: Array.isArray(rec.history) ? rec.history : [] };
+    state.words[w] = { ...newRecord(w), ...rec, history: Array.isArray(rec.history) ? rec.history : [] };
+    if (!spellable(w)) state.words[w].built = true;
   }
   for (const k of ['hatched', 'stickers', 'sessions', 'checks']) if (!Array.isArray(state[k])) state[k] = [];
   if (!state.resets || typeof state.resets !== 'object') state.resets = {};
@@ -81,7 +82,7 @@ export function importText(text) {
 }
 
 export function record(state, word) {
-  if (!state.words[word]) state.words[word] = newRecord();
+  if (!state.words[word]) state.words[word] = newRecord(word);
   return state.words[word];
 }
 
