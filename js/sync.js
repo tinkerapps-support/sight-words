@@ -29,7 +29,7 @@ export const syncInfo = () => load();
 // Something changed on this device since the last sync (main.js calls this on every save).
 export function markDirty() { const info = load(); if (info.code && !info.dirty) update({ dirty: true }); }
 
-function deviceId() {
+export function deviceId() {
   let { deviceId: id } = load();
   if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join(''); update({ deviceId: id }); }
   return id;

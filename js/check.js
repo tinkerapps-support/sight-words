@@ -6,6 +6,7 @@ import { CONFIG } from './config.js';
 import { wordId, cheerId, CHEERS } from './voice-lines.js';
 import * as audio from './audio.js';
 import * as device from './device.js';
+import { noteCheck } from './daily.js';
 
 const $ = id => document.getElementById(id);
 const shuffle = arr => {
@@ -114,6 +115,7 @@ function finish() {
   const total = words.length;
   const st = ctx.state();
   st.checks = [...(st.checks || []), { t: Date.now(), right, total, missed, asked: words }].slice(-50);
+  noteCheck(st, Date.now(), right, total);
   ctx.persist();
   $('check-bar').style.width = '100%';
   $('check-play').hidden = true;

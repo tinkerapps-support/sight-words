@@ -164,6 +164,7 @@
           <button data-len="short">Short</button><button data-len="normal">Normal</button><button data-len="long">Long</button>
         </div>
       </div>
+      <button class="setting nav" data-go="calendar">Calendar: days and time played <span>›</span></button>
       <button class="setting nav" data-go="progress">Progress report <span>›</span></button>
       <button class="setting nav" id="start-meet">Meet the words (quick check) <span>›</span></button>
       <div class="setting col">
@@ -309,6 +310,22 @@
         Progress lives on this phone, so either save a <b>backup</b> now and then or turn on <b>Sync</b>:
         create a sync code, enter it on another phone or tablet, and both keep the same progress.</p>
     </div>
+  </section>
+
+  <section id="calendar-screen" class="screen grown" hidden>
+    <header class="topbar"><button class="icon-btn small back" data-back="settings" aria-label="Back"><span class="glyph" data-icon="ui-back">‹</span></button><h2>Calendar</h2><span class="spacer"></span></header>
+    <div class="cal-nav">
+      <button id="cal-prev" class="small-btn" aria-label="Previous month">‹</button>
+      <b id="cal-month"></b>
+      <button id="cal-next" class="small-btn" aria-label="Next month">›</button>
+    </div>
+    <div id="cal-summary" class="report-summary"></div>
+    <div class="cal-grid cal-head"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+    <div id="cal-grid" class="cal-grid"></div>
+    <div id="cal-day" class="report-summary cal-day"></div>
+    <p class="note">Time counts while the app is open and being used (it pauses after 2 minutes without a
+      touch), on every synced device. Days marked ≈ were played before the calendar existed: their numbers
+      are worked out from the cards played, and the time is an estimate.</p>
   </section>
 
   <section id="progress-screen" class="screen grown" hidden>

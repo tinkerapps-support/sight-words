@@ -1,6 +1,7 @@
 // Saved progress (localStorage) plus backup export/import (PLAN.md §7, §9).
 import { newRecord, spellable } from './engine.js';
 import { CONFIG } from './config.js';
+import { normalizeDaily, mergeDaily, EST_DEVICE } from './daily.js';
 import { LISTS } from './lists.js';
 
 const KEY = 'sightwords.v1';
@@ -19,6 +20,8 @@ export function defaultState() {
     resets: {},       // word -> when the parent reset it (so sync doesn't bring old progress back)
     resetAll: 0,      // when all progress was last reset
     toysOpened: {},   // list id -> how many of that meadow's toy presents have been opened
+    daily: {},        // the parent's calendar: 'YYYY-MM-DD' -> one record per day (daily.js, docs/DATA.md)
+    dailySince: 0,    // when the calendar started counting live (earlier days are estimated)
     settings: {
       lists: [LISTS[0].id],
       fullscreen: false,
@@ -48,6 +51,8 @@ export function normalize(raw) {
   if (!state.resets || typeof state.resets !== 'object') state.resets = {};
   if (typeof state.resetAll !== 'number') state.resetAll = 0;
   if (!state.toysOpened || typeof state.toysOpened !== 'object') state.toysOpened = {};
+  state.daily = normalizeDaily(state.daily);
+  if (typeof state.dailySince !== 'number') state.dailySince = 0;
   state.settings.lists = state.settings.lists.filter(id => LISTS.some(l => l.id === id));
   if (!state.settings.lists.length) state.settings.lists = [LISTS[0].id];
   return state;
@@ -84,6 +89,20 @@ export function importText(text) {
 export function record(state, word) {
   if (!state.words[word]) state.words[word] = newRecord(word);
   return state.words[word];
+}
+
+// The calendar part of a merge (also used when a device takes the cloud copy, so the time counted
+// here since the last save isn't lost). Each device's counters merge by max. The estimated days
+// before the calendar are taken from whichever copy filled them first, so they never count twice.
+export function mergeCalendar(local, remote) {
+  const since = [local.dailySince, remote.dailySince].filter(Boolean);
+  const withoutEst = d => Object.fromEntries(Object.entries(d || {}).map(([k, v]) => [k, { ...v, dev: Object.fromEntries(Object.entries(v.dev).filter(([id]) => id !== EST_DEVICE)) }]));
+  const both = local.dailySince && remote.dailySince;
+  return {
+    daily: mergeDaily(both && local.dailySince > remote.dailySince ? withoutEst(local.daily) : local.daily || {},
+      both && remote.dailySince > local.dailySince ? withoutEst(remote.daily) : remote.daily || {}),
+    dailySince: since.length ? Math.min(...since) : 0,
+  };
 }
 
 // Sync (sync.js): combine this device's progress with the synced copy so nothing is lost.
@@ -131,6 +150,7 @@ export function mergeStates(local, remoteRaw) {
   }
   return {
     ...local,
+    ...mergeCalendar(local, remote),
     setupDone: local.setupDone || remote.setupDone,
     words, hatched, resets, resetAll, toysOpened,
     stickers: events('stickers'), sessions: events('sessions'), checks: events('checks').slice(-50),

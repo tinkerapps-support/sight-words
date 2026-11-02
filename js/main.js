@@ -2,8 +2,9 @@
 import { CONFIG, LEVEL_NAMES } from './config.js';
 import { applyResult, applyPlacement, buildSession, Session, markHeadStart, unmarkHeadStart, newRecord, dayKey, needsIntro, applyIntro, restWord, spellable, hatchProgress, HATCH_STEPS, nextStep, cardKind, applyPop, applyBuild, paceLevel, PACE_NAMES, nextFreshWord, bubbleCount } from './engine.js';
 import { LISTS, activeWords, wordEntry } from './lists.js';
-import { load, save, record, exportText, importText, defaultState, normalize } from './storage.js';
-import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid, markDirty, listVersions, resolveConflict } from './sync.js';
+import { load, save, record, exportText, importText, defaultState, normalize, mergeCalendar } from './storage.js';
+import { syncInfo, syncNow, newCode, setCode, clearCode, normalizeCode, codeLooksValid, markDirty, listVersions, resolveConflict, deviceId } from './sync.js';
+import { bump, noteWord, backfillDaily, dayTotals, monthSummary, usedDay } from './daily.js';
 import * as audio from './audio.js';
 import * as music from './music.js';
 import { wordId, sentenceId, cheerId, letterId, clozeParts, CHEERS, FAST_CHEERS, NOT_YET } from './voice-lines.js';
@@ -33,6 +34,8 @@ const stickerHtml = n => {
 };
 
 let state = load();
+// The calendar starts with the days played before it existed, worked out once from the histories.
+if (backfillDaily(state, Date.now())) save(state);
 let page = 0;              // which list's meadow is showing
 let mode = 'learn';        // 'learn' | 'meet'
 let session = null;
@@ -70,9 +73,9 @@ const stepHtml = (rec, now) => {
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'check-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen'];
+const SCREENS = ['home', 'play-screen', 'check-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen', 'calendar-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', check: 'check-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', calendar: 'calendar-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', check: 'check-screen', end: 'end-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
@@ -82,6 +85,7 @@ function go(name) {
   if (id === 'setup-screen') renderSetup();
   if (id === 'settings-screen') renderSettings();
   if (id === 'progress-screen') renderProgress();
+  if (id === 'calendar-screen') { calMonth = null; calDay = null; renderCalendar(); doSync(); }
   if (id === 'sticker-screen') renderStickers();
 }
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => go(b.dataset.back)));
@@ -171,10 +175,13 @@ async function doSync(force = false, { midGame = false } = {}) {
 
 // Use progress that came from the cloud. Saved without marking this device as changed.
 function adopt(next) {
+  const mine = state;
   state = normalize({ ...next, v: 1, settings: state.settings }) || state;
+  if (state !== mine) Object.assign(state, mergeCalendar(mine, state));
   save(state);
   if (!$('home').hidden) renderHome();
   if (!$('progress-screen').hidden) renderProgress();
+  if (!$('calendar-screen').hidden) renderCalendar();
   if (!$('sticker-screen').hidden) renderStickers();
   if (!$('settings-screen').hidden) renderSettings();
 }
@@ -591,6 +598,7 @@ function taskDone(c, firstTry, picked) {
   const stepBefore = hatchProgress(rec, Date.now()).step;
   const res = kind === 'pop' ? applyPop(rec, firstTry, Date.now(), picked) : applyBuild(rec, firstTry, Date.now());
   const missed = kind === 'pop' && !firstTry;
+  bump(state, Date.now(), deviceId(), kind === 'pop' ? { pop: 1, popRight: firstTry ? 1 : 0 } : { build: 1, buildRight: firstTry ? 1 : 0 });
   session.answer(missed ? 'notyet' : 'got');
   if (missed && session.missCount[word] >= CONFIG.restAfterMisses) {
     restWord(rec, Date.now());
@@ -661,8 +669,13 @@ function answer(result) {
       state.hatched.push(word);
       sessionStats.hatched.push(word);
       hatchedNow = true;
+      noteWord(state, Date.now(), 'hatched', word);
     }
+    if (res.before < 5 && res.after === 5) noteWord(state, Date.now(), 'crowned', word);
   }
+  // The calendar counts the result as scored (a Fast with a hint is a Got it).
+  const scored = result === 'fast' && hinted ? 'got' : result;
+  bump(state, Date.now(), deviceId(), { read: 1, right: scored === 'notyet' ? 0 : 1, fast: scored === 'fast' ? 1 : 0, hinted: hinted ? 1 : 0, notyet: scored === 'notyet' ? 1 : 0 });
   session.answer(result);
   if (mode === 'learn' && result === 'notyet' && session.missCount[word] >= CONFIG.restAfterMisses) {
     restWord(rec, Date.now());
@@ -993,6 +1006,7 @@ $('next').addEventListener('click', () => {
     delete $('next').dataset.intro;
     pushUndo(card.word);
     applyIntro(record(state, card.word), Date.now());
+    noteWord(state, Date.now(), 'met', card.word);
     session.answer('intro');
     persist();
   }
@@ -1005,6 +1019,7 @@ function pushUndo(word) {
   undoStack.push({
     word, rec: structuredClone(record(state, word)), meter: state.meter, hatched: state.hatched.slice(),
     stats: structuredClone(sessionStats),
+    today: dayKey(Date.now()), day: structuredClone(state.daily[dayKey(Date.now())] ?? null),
     session: {
       queue: session.queue.slice(), index: session.index, retries: { ...session.retries }, correct: [...session.correctWords],
       extraEnd: session.extraEnd, results: session.results.slice(), missCount: { ...session.missCount },
@@ -1029,6 +1044,12 @@ $('btn-undo').addEventListener('click', () => {
     correctWords: new Set(u.session.correct), extraEnd: u.session.extraEnd, results: u.session.results,
     missCount: u.session.missCount,
   });
+  // The calendar day goes back too, except the time on the clock (that was really spent).
+  const msNow = Object.fromEntries(Object.entries(state.daily[u.today]?.dev || {}).map(([id, c]) => [id, c.ms]));
+  if (u.day) {
+    state.daily[u.today] = u.day;
+    for (const [id, ms] of Object.entries(msNow)) if (ms) (u.day.dev[id] ||= {}).ms = ms;
+  }
   persist();
   busy = false;
   renderMeter();
@@ -1080,6 +1101,7 @@ function endSession() {
   state.stickers.push({ t: Date.now(), n, id: STICKERS[n - 1] });
   state.sessions.push({ t: Date.now(), cards: sessionStats.cards, correct: sessionStats.correct, fast: sessionStats.fast });
   if (state.sessions.length > 400) state.sessions.splice(0, state.sessions.length - 400);
+  bump(state, Date.now(), deviceId(), { games: 1, stickers: 1 });
   persist();
   $('end-title').textContent = pick(['Great reading!', 'You did it!', 'Super reading!']);
   $('end-sticker').innerHTML = stickerHtml(n);
@@ -1239,7 +1261,8 @@ $('import-file').addEventListener('change', async e => {
 $('reset-all').addEventListener('click', async () => {
   if (!(await mathCheck('Erase all progress, friends and stickers? This can\'t be undone (unless you saved a backup).'))) return;
   const settings = state.settings;
-  state = { ...defaultState(), settings, resetAll: Date.now() };
+  // The calendar is a record of time spent, not progress: it stays.
+  state = { ...defaultState(), settings, resetAll: Date.now(), daily: state.daily, dailySince: state.dailySince || Date.now() };
   persist();
   go('setup');
 });
@@ -1249,6 +1272,68 @@ $('reset-all').addEventListener('click', async () => {
 let reportList = null;   // which word set the report shows
 const shortDay = t => (t ? new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
 const pctText = v => (v === null ? '—' : `${v}%`);
+
+// ---------------------------------------------------------------- calendar (Settings → Calendar)
+
+let calMonth = null;   // first of the month shown (a Date), null = this month
+let calDay = null;     // 'YYYY-MM-DD' picked, null = today (or the last day played that month)
+const minutes = ms => {
+  const m = Math.round(ms / 60e3);
+  return m < 1 ? (ms > 0 ? 'under a minute' : '0 min') : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+};
+function renderCalendar() {
+  const now = Date.now();
+  const today = dayKey(now);
+  if (!calMonth) calMonth = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1);
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  $('cal-month').textContent = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  $('cal-next').disabled = today.startsWith(dayKey(calMonth).slice(0, 7));
+  const daily = state.daily || {};
+  const sum = monthSummary(daily, y, m, now);
+  $('cal-summary').innerHTML = `<b>${sum.days} day${sum.days === 1 ? '' : 's'} played</b> this month · ${minutes(sum.ms)} in all${sum.days ? ` · about ${minutes(sum.avgMs)} a day played` : ''}
+    <p>Days in a row right now: <b>${sum.streak}</b></p>`;
+  const keys = Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) => dayKey(new Date(y, m, i + 1, 12)));
+  if (!calDay || !keys.includes(calDay)) calDay = keys.includes(today) ? today : [...keys].reverse().find(k => usedDay(daily[k])) || keys[0];
+  const grid = $('cal-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < calMonth.getDay(); i++) grid.appendChild(document.createElement('span'));
+  keys.forEach((k, i) => {
+    const t = dayTotals(daily[k]);
+    const played = usedDay(daily[k]);
+    const b = document.createElement('button');
+    b.className = 'cal-cell' + (played ? ' used' : '') + (k === today ? ' today' : '') + (k === calDay ? ' picked' : '');
+    // The colour deepens with time: 15 minutes or more is the full colour.
+    b.style.setProperty('--fill', String(Math.min(1, t.ms / (15 * 60e3))));
+    b.disabled = k > today;
+    b.innerHTML = `<b>${i + 1}</b><small>${played ? `${t.estimated ? '≈' : ''}${Math.max(1, Math.round(t.ms / 60e3))}m` : ''}</small>`;
+    b.addEventListener('click', () => { calDay = k; renderCalendar(); });
+    grid.appendChild(b);
+  });
+  renderCalDay(calDay);
+}
+function renderCalDay(k) {
+  const d = (state.daily || {})[k];
+  const t = dayTotals(d);
+  const title = new Date(`${k}T12:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  if (!usedDay(d)) { $('cal-day').innerHTML = `<b>${title}</b><p>Not played.</p>`; return; }
+  const pctOf = (n, of) => (of ? `${Math.round((n / of) * 100)}%` : '—');
+  const words = list => list.map(w => `<span class="cal-word">${show(w)}</span>`).join(' ');
+  const rows = [
+    ['Time', `${t.estimated ? '≈ ' : ''}${minutes(t.ms)}`],
+    ['Games', `${t.games} finished · ${t.stickers} sticker${t.stickers === 1 ? '' : 's'}`],
+    ['Reading', t.read ? `${t.read} card${t.read === 1 ? '' : 's'} · ${pctOf(t.right, t.read)} right · ${t.fast} Fast · ${t.notyet} Not yet · ${t.hinted} with a hint` : '—'],
+    ['Bubble Pop', t.pop ? `${t.popRight} of ${t.pop} right` : '—'],
+    ['Build It', t.build ? `${t.buildRight} of ${t.build} right first try` : '—'],
+    ['Word Check', t.checks.length ? t.checks.map(c => `${c.right} of ${c.total}`).join(', ') : '—'],
+    ['New words', t.met.length ? words(t.met) : '—'],
+    ['Hatched', t.hatched.length ? words(t.hatched) : '—'],
+    ['Crowned', t.crowned.length ? words(t.crowned) : '—'],
+  ];
+  $('cal-day').innerHTML = `<b>${title}</b>${t.estimated ? ' <span class="wr-tag">estimated</span>' : ''}
+    <dl class="cal-stats">${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+}
+$('cal-prev').addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); calDay = null; renderCalendar(); });
+$('cal-next').addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); calDay = null; renderCalendar(); });
 
 function renderProgress() {
   const now = Date.now();
@@ -1342,6 +1427,20 @@ function applyLock() {
   else unlockTimer = setTimeout(() => set(false), 450);
 }
 audio.onVoice(on => { music.duck(on); voiceOn = on; applyLock(); });
+
+// Calendar clock: time counts while the page is on screen and in front, and someone touched it in
+// the last 2 minutes (an app left open on the table doesn't count). Saved without marking the device
+// changed, so it never causes a sync conflict on its own; it rides along with the next real save.
+const USAGE_TICK = 15e3, USAGE_IDLE = 120e3;
+let lastTouchAt = Date.now(), lastTickAt = Date.now();
+window.addEventListener('pointerdown', () => { lastTouchAt = Date.now(); }, true);
+setInterval(() => {
+  const now = Date.now(), gap = now - lastTickAt;
+  lastTickAt = now;
+  if (!$('start-gate').hidden || document.visibilityState !== 'visible' || !document.hasFocus() || now - lastTouchAt > USAGE_IDLE) return;
+  bump(state, now, deviceId(), { ms: Math.min(gap, USAGE_TICK * 2) });
+  save(state);
+}, USAGE_TICK);
 for (const s of SCREENS) $(s).hidden = true;
 document.querySelectorAll('.mascot').forEach(m => setMascot(m, (m.className.match(/\b(idle|think|cheer|gentle)\b/) || [, 'idle'])[1]));
 if (art('meadow-bg')) document.body.classList.add('has-meadow');
