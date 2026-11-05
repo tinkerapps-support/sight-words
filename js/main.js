@@ -23,11 +23,19 @@ const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 // Placeholder creatures until Codex's art lands: one per word, by list position.
 const CREATURES = ['🐰', '🐱', '🐹', '🐲', '🐸', '🦊', '🐦', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐵', '🐧', '🐤', '🦉', '🦋', '🐢', '🐙', '🦔', '🐿️', '🐳', '🦄'];
-// Sticker N (1-20) is Codex's sticker-NN art; the emoji is the fallback and matches its subject.
-const STICKERS = ['🌈', '⭐', '🦄', '🌸', '🍓', '🧁', '🎀', '💖', '🌟', '🍭', '🦋', '🌷', '🍩', '🎈', '🐚', '🌙', '☁️', '🍦', '🪄', '👑'];
+// Sticker N is Codex's sticker-NN art; the emoji is only a fallback and matches its subject.
+// Each word list has its own page of STICKER_PAGE stickers (owner, 2026-11-04): list 1 earns 1-20,
+// list 2 earns 21-40. A list past the art made so far reuses the pages in turn.
+const STICKERS = ['🌈', '⭐', '🦄', '🌸', '🍓', '🧁', '🎀', '💖', '🌟', '🍭', '🦋', '🌷', '🍩', '🎈', '🐚', '🌙', '☁️', '🍦', '🪄', '👑',
+  '☀️', '🍎', '🍒', '🍉', '🪁', '🧸', '⛵', '🎈', '🍄', '🍃', '❄️', '🎁', '🎵', '🎨', '🚀', '🪐', '🏰', '🦆', '🍪', '🍀'];
 const STICKER_PAGE = 20;
+const STICKER_SETS = STICKERS.length / STICKER_PAGE;
 // Older saves stored only the emoji; map it back to its number.
 const stickerNum = s => s.n || STICKERS.indexOf(s.id) + 1 || 1;
+// Which list a sticker belongs to: saved since 2026-11-04, worked out from its number before that.
+const stickerList = s => s.list || LISTS[Math.floor((stickerNum(s) - 1) / STICKER_PAGE)]?.id || LISTS[0].id;
+// The list she's working on: the newest one that's on. Its page gets the next sticker.
+const currentList = () => [...LISTS].reverse().find(l => state.settings.lists.includes(l.id)) || LISTS[0];
 const stickerHtml = n => {
   const src = art(`sticker-${String(n).padStart(2, '0')}`);
   return src ? img(src) : STICKERS[(n - 1) % STICKERS.length];
@@ -73,9 +81,9 @@ const stepHtml = (rec, now) => {
 
 // ---------------------------------------------------------------- navigation
 
-const SCREENS = ['home', 'play-screen', 'check-screen', 'guide-screen', 'end-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen', 'calendar-screen'];
+const SCREENS = ['home', 'play-screen', 'check-screen', 'guide-screen', 'sticker-screen', 'setup-screen', 'settings-screen', 'progress-screen', 'calendar-screen'];
 function go(name) {
-  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', calendar: 'calendar-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', check: 'check-screen', end: 'end-screen' }[name] || name;
+  const id = { setup: 'setup-screen', settings: 'settings-screen', progress: 'progress-screen', calendar: 'calendar-screen', guide: 'guide-screen', stickers: 'sticker-screen', play: 'play-screen', check: 'check-screen' }[name] || name;
   for (const s of SCREENS) $(s).hidden = s !== id;
   if (id !== 'home') stopPets();
   if (id === 'home') renderHome();
@@ -410,6 +418,25 @@ function entries() {
   return activeWords(state.settings.lists);
 }
 
+// A game runs in rounds of CONFIG.roundLength cards. When one runs out she just carries on: the next
+// round is built from where every word stands now (new words and pace included).
+function buildRound(pace) {
+  return buildSession({ records: state.words, entries: entries(), now: Date.now(), length: CONFIG.roundLength, pace });
+}
+function nextRound() {
+  const pace = paceLevel(state.words, Date.now());
+  const { queue, clash } = buildRound(pace);
+  const last = session.queue[session.queue.length - 1];
+  if (queue.length > 1 && queue[0] === last) queue.push(queue.shift());   // never the same word twice running
+  session.queue.push(...queue);
+  session.clash = clash;
+  session.extraEnd = false;
+  sessionStats.pace = pace;
+  sessionStats.topUps = 0;
+  sessionStats.rounds++;
+  audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
+}
+
 function startSession(kind) {
   mode = kind;
   const ents = entries();
@@ -419,15 +446,10 @@ function startSession(kind) {
     queue = ents.filter(e => !state.words[e.word]?.headStart && levelOf(e.word) === 0).map(e => e.word);
     if (!queue.length) { go('settings'); return; }
   } else {
-    const built = buildSession({
-      records: state.words, entries: ents, now: Date.now(),
-      length: CONFIG.sessionLength[state.settings.sessionLength] || CONFIG.sessionLength.normal, pace,
-    });
-    queue = built.queue;
-    clash = built.clash;
+    ({ queue, clash } = buildRound(pace));
   }
   session = new Session({ queue, clash, retries: kind !== 'meet', isSure: w => levelOf(w) >= 3 && cardKind(state.words[w], () => 1, w) === 'read' });
-  sessionStats = { pace, topUps: 0, cards: 0, correct: 0, fast: 0, hatched: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
+  sessionStats = { pace, topUps: 0, cards: 0, correct: 0, fast: 0, rainbows: 0, rounds: 1, hatched: [], stickers: [], levelOnes: ents.filter(e => levelOf(e.word) === 1).length };
   undoStack = [];
   audio.preload([...new Set(queue)].flatMap(w => [wordId(w), sentenceId(w)]));
   renderMeter();
@@ -439,7 +461,14 @@ function startSession(kind) {
   showCard();
 }
 
-function renderMeter(full = false) {
+function renderMeter(full = false, stickerNow = false) {
+  // The dots: full rainbows toward the next sticker (all lit for the moment one is earned).
+  const lit = stickerNow ? CONFIG.rainbowsPerSticker : state.rainbows || 0;
+  const on = art('dot-on'), off = art('dot-off');
+  $('rainbow-dots').innerHTML = Array.from({ length: CONFIG.rainbowsPerSticker }, (_, i) => {
+    const src = i < lit ? on : off;
+    return `<i class="${i < lit ? 'on' : ''}${src ? ' felt' : ''}"${src ? ` style="background-image:url(${src})"` : ''}></i>`;
+  }).join('');
   const m = $('meter');
   m.innerHTML = '';
   for (let i = 0; i < CONFIG.meterBands; i++) {
@@ -474,7 +503,10 @@ function showCard() {
   $('parent-strip').hidden = false;
   // (No unlock here: the strip stays locked while a voice line is still playing.)
   $('btn-undo').disabled = !undoStack.length;
-  if (session.done) { endSession(); return; }
+  if (session.done) {
+    if (mode !== 'learn') { endSession(); return; }
+    nextRound();
+  }
   const word = session.current;
   const level = levelOf(word);
   card = { word, level, shown: new Set(), start: performance.now(), timers: [] };
@@ -827,15 +859,54 @@ function hatchShow(word) {
   });
 }
 
+// The break every CONFIG.rainbowsPerBreak rainbows: the meadow (the game ends) or keep reading.
+function showBreak() {
+  card = null;
+  $('break').hidden = false;
+  setMascot($('break-mascot'), 'cheer');
+  const friend = state.hatched[state.hatched.length - 1];
+  $('break-friend').innerHTML = friend ? creatureFor(friend) : eggFor(0);
+  audio.say('break', 'Two rainbows! Back to the meadow, or keep reading?');
+}
+$('break-more').addEventListener('click', () => { audio.stop(); audio.chime.tap(); $('break').hidden = true; showCard(); });
+$('break-meadow').addEventListener('click', () => { audio.stop(); $('break').hidden = true; endSession(); });
+
+// A sticker earned by the rainbows: added to the book now, shown big for a moment.
+function awardSticker() {
+  const list = currentList();
+  const set = LISTS.indexOf(list) % STICKER_SETS;
+  const have = state.stickers.filter(s => stickerList(s) === list.id).length;
+  const n = set * STICKER_PAGE + (have % STICKER_PAGE) + 1;
+  state.stickers.push({ t: Date.now(), n, id: STICKERS[n - 1], list: list.id });
+  bump(state, Date.now(), deviceId(), { stickers: 1 });
+  sessionStats.stickers.push(n);
+  return n;
+}
+async function stickerPop(n, s, token) {
+  if (session !== s || token !== celebrationToken) return;
+  const el = $('sticker-pop');
+  el.innerHTML = stickerHtml(n);
+  el.hidden = false;
+  audio.chime.sticker();
+  await Promise.all([audio.say('sticker', 'You earned a sticker!'), new Promise(r => setTimeout(r, 1800))]);
+  el.hidden = true;
+}
+
 function celebrate(fast, hatchedNow, change) {
   setMascot($('play-mascot'), 'cheer');
   fast ? audio.chime.fast() : audio.chime.correct();
   burst(fast ? ['⚡', '⭐', '✨'] : ['⭐', '💖', '✨']);
   state.meter++;
-  let full = false;
+  let full = false, sticker = 0;
   if (state.meter >= CONFIG.meterBands) { state.meter = 0; full = true; }
+  // Every CONFIG.rainbowsPerSticker full rainbows earn a sticker, there and then (owner, 2026-11-04).
+  if (full) {
+    sessionStats.rainbows++;
+    state.rainbows = (state.rainbows || 0) + 1;
+    if (state.rainbows >= CONFIG.rainbowsPerSticker) { state.rainbows = 0; sticker = awardSticker(); }
+  }
   persist();
-  renderMeter(full);
+  renderMeter(full, Boolean(sticker));
   if (full) { audio.chime.rainbow(); burst(['🌈', '✨', '💖', '⭐'], 18); doSync(true, { midGame: true }); }
   // A voice cheer now and then, not on every card (never over a hatching).
   let cheer = Promise.resolve();
@@ -843,16 +914,21 @@ function celebrate(fast, hatchedNow, change) {
   else if (!hatchedNow && Math.random() < 0.35) { const t = pick(fast ? FAST_CHEERS : CHEERS); cheer = audio.say(cheerId(t), t); }
   // Stale if the parent stopped or undid meanwhile (Undo/Quit replace the session state).
   const s = session, token = ++celebrationToken;
+  // A sticker earned now shows after the rainbow cheer (after the hatching, if one is happening).
+  if (sticker && !hatchedNow) cheer = cheer.then(() => stickerPop(sticker, s, token));
+  // Every CONFIG.rainbowsPerBreak rainbows this game, she picks: the meadow or more reading.
+  const pause = full && mode === 'learn' && sessionStats.rainbows % CONFIG.rainbowsPerBreak === 0;
   const next = () => {
     if (session !== s || token !== celebrationToken) return;
-    hideEggPop(); busy = false; if (full) renderMeter(); showCard();
+    hideEggPop(); busy = false; if (full) renderMeter();
+    if (pause) showBreak(); else showCard();
   };
   if (hatchedNow) {
     // Show the cracked egg for a beat, then the hatching takes over the screen.
     eggPop({ ...change, before: 3, after: 3, hatching: true });
     setTimeout(() => {
       if (session !== s || token !== celebrationToken) return;
-      hideEggPop(); hatchShow(change.word).then(next);
+      hideEggPop(); hatchShow(change.word).then(() => (sticker ? stickerPop(sticker, s, token) : null)).then(next);
     }, 900);
     return;
   }
@@ -873,16 +949,14 @@ async function teach(word) {
   $('teach-next').hidden = false;
   busy = false;
   const t = pick(NOT_YET);
-  // The word on its own, then in its sentence (owner, 2026-10-26). Stops if the parent moves on.
+  // The word, spelled out quickly, then her turn. Kept short so she stays with it (owner,
+  // 2026-11-04); the sentence stays on the card and reads itself when tapped. Stops if the parent
+  // moves on.
   const still = () => card?.word === word && !$('teach-next').hidden;
-  const pause = ms => new Promise(r => setTimeout(r, ms));
   await audio.say(cheerId(t), t);
   if (still()) await audio.say(wordId(word), word);
-  if (still()) await pause(450);
+  if (still()) await new Promise(r => setTimeout(r, 150));
   if (still()) await spellRead(word, still);
-  if (still()) await pause(300);
-  const entry = wordEntry(word);
-  if (still() && entry) await readSentence(word, { cloze: false });
   await yourTurn(still, { lock: false });
 }
 
@@ -972,8 +1046,9 @@ async function spellRead(word, still) {
   const spans = [...w.querySelectorAll('.ltr')];
   for (let i = 0; i < letters.length && still(); i++) {
     spans.forEach((s, j) => s.classList.toggle('lit', j === i));
-    await audio.say(letterId(letters[i]), letters[i].toUpperCase());
-    await new Promise(r => setTimeout(r, 120));
+    // Quick, so the word stays together in her head (owner, 2026-11-04: spelling out was too slow).
+    await audio.say(letterId(letters[i]), letters[i].toUpperCase(), { now: true, rate: CONFIG.spellRate });
+    await new Promise(r => setTimeout(r, 60));
   }
   if (!still()) return;
   spans.forEach(s => s.classList.add('lit'));
@@ -1017,7 +1092,7 @@ $('next').addEventListener('click', () => {
 // Everything a card can change, so Undo puts it all back.
 function pushUndo(word) {
   undoStack.push({
-    word, rec: structuredClone(record(state, word)), meter: state.meter, hatched: state.hatched.slice(),
+    word, rec: structuredClone(record(state, word)), meter: state.meter, rainbows: state.rainbows, stickerCount: state.stickers.length, hatched: state.hatched.slice(),
     stats: structuredClone(sessionStats),
     today: dayKey(Date.now()), day: structuredClone(state.daily[dayKey(Date.now())] ?? null),
     session: {
@@ -1037,6 +1112,8 @@ $('btn-undo').addEventListener('click', () => {
   clearTask();
   state.words[u.word] = u.rec;
   state.meter = u.meter;
+  state.rainbows = u.rainbows;
+  state.stickers = state.stickers.slice(0, u.stickerCount);
   state.hatched = u.hatched;
   sessionStats = u.stats;
   Object.assign(session, {
@@ -1059,6 +1136,8 @@ $('btn-undo').addEventListener('click', () => {
 $('quit').addEventListener('click', async () => {
   const keep = sessionStats.cards;
   if (!(await confirmBox(keep ? 'Stop now? Progress so far is saved.' : 'Stop now?'))) return;
+  if (mode === 'learn') recordGame();
+  $('break').hidden = true;
   clearTimers();
   celebrationToken++;
   hideEggPop();
@@ -1097,44 +1176,48 @@ function endSession() {
   card = null;
   device.keepAwake(false);
   if (mode === 'meet') { go('settings'); return; }
-  const n = (state.stickers.length % STICKERS.length) + 1;
-  state.stickers.push({ t: Date.now(), n, id: STICKERS[n - 1] });
-  state.sessions.push({ t: Date.now(), cards: sessionStats.cards, correct: sessionStats.correct, fast: sessionStats.fast });
-  if (state.sessions.length > 400) state.sessions.splice(0, state.sessions.length - 400);
-  bump(state, Date.now(), deviceId(), { games: 1, stickers: 1 });
-  persist();
-  $('end-title').textContent = pick(['Great reading!', 'You did it!', 'Super reading!']);
-  $('end-sticker').innerHTML = stickerHtml(n);
-  $('end-hatched').innerHTML = sessionStats.hatched.length
-    ? `New friend${sessionStats.hatched.length > 1 ? 's' : ''}! ${sessionStats.hatched.map(w => `<span class="new">${creatureFor(w)}</span>`).join(' ')}`
-    : '';
-  go('end');
-  setMascot($('end-mascot'), 'cheer');
-  // Hatches were already celebrated as they happened; the end screen is about the sticker.
-  audio.chime.sticker();
-  audio.say('session-end', 'You read so many words!').then(() => {
-    if (!$('end-screen').hidden) audio.say('sticker', 'You earned a sticker!');
-  });
+  recordGame();
+  session = null;
+  go('home');
+  audio.say('session-end', 'You read so many words!');
 }
+// A game played (even one stopped with ✕) is kept for the report and the calendar.
+function recordGame() {
+  if (!sessionStats?.cards || sessionStats.recorded) return;
+  sessionStats.recorded = true;
+  state.sessions.push({ t: Date.now(), cards: sessionStats.cards, correct: sessionStats.correct, fast: sessionStats.fast, stickers: sessionStats.stickers.length });
+  if (state.sessions.length > 400) state.sessions.splice(0, state.sessions.length - 400);
+  bump(state, Date.now(), deviceId(), { games: 1 });
+  persist();
+}
+
 let bookPage = null;
 $('book-prev').addEventListener('click', () => { audio.chime.whoosh(); bookPage--; renderStickers(); });
 $('book-next').addEventListener('click', () => { audio.chime.whoosh(); bookPage++; renderStickers(); });
-$('end-done').addEventListener('click', () => { audio.stop(); go('home'); });
 
 function renderStickers() {
-  // A book of 20-sticker pages (one per felt album page), opening on the newest page.
-  const earned = state.stickers.map(stickerNum);
-  const pages = Math.max(1, Math.ceil(earned.length / STICKER_PAGE));
-  if (bookPage === null || bookPage >= pages) bookPage = pages - 1;
-  const first = bookPage * STICKER_PAGE;
+  // A book with a page per word list (a full page goes on to another page for that list), opening
+  // on the page the next sticker goes to.
+  const pages = [];
+  for (const list of LISTS) {
+    const mine = state.stickers.filter(s => stickerList(s) === list.id).map(stickerNum);
+    if (!mine.length && list !== currentList()) continue;
+    for (let i = 0; i < Math.max(1, Math.ceil(mine.length / STICKER_PAGE)); i++) {
+      pages.push({ list, stickers: mine.slice(i * STICKER_PAGE, (i + 1) * STICKER_PAGE) });
+    }
+  }
+  const open = pages.findLastIndex(p => p.list === currentList());
+  if (bookPage === null || bookPage >= pages.length) bookPage = Math.max(0, open);
+  const p = pages[bookPage];
   const locked = art('sticker-locked');
-  $('book-page').textContent = pages > 1 ? `${bookPage + 1} / ${pages}` : '';
+  $('book-page').textContent = pages.length > 1 ? `${bookPage + 1} / ${pages.length}` : '';
   $('book-prev').style.visibility = bookPage > 0 ? 'visible' : 'hidden';
-  $('book-next').style.visibility = bookPage < pages - 1 ? 'visible' : 'hidden';
-  $('sticker-grid').innerHTML = Array.from({ length: STICKER_PAGE }, (_, j) => j + first).map(i => i < earned.length
-    ? `<span class="got" style="--tilt:${((i * 37) % 13) - 6}deg">${stickerHtml(earned[i])}</span>`
+  $('book-next').style.visibility = bookPage < pages.length - 1 ? 'visible' : 'hidden';
+  $('sticker-grid').innerHTML = Array.from({ length: STICKER_PAGE }, (_, i) => i < p.stickers.length
+    ? `<span class="got" style="--tilt:${((i * 37) % 13) - 6}deg">${stickerHtml(p.stickers[i])}</span>`
     : `<span class="empty">${locked ? img(locked) : ''}</span>`).join('');
-  $('sticker-note').textContent = earned.length ? '' : 'Finish a game to earn your first sticker!';
+  $('sticker-note').textContent = !state.stickers.length ? 'Fill 3 rainbows to earn your first sticker!'
+    : LISTS.length > 1 && pages.length > 1 ? `${p.list.name} stickers` : '';
 }
 
 // ---------------------------------------------------------------- grown-up: head start
@@ -1192,8 +1275,8 @@ function renderSettings() {
     : 'Not available at this address (needs https). The screen may dim during a game.';
   $('set-volume').value = s.voiceVolume;
   $('set-effects').checked = s.effects;
+  $('set-crowns').checked = s.crowns !== false;
   $('set-music').checked = s.music;
-  document.querySelectorAll('#set-length button').forEach(b => b.classList.toggle('on', b.dataset.len === s.sessionLength));
   const lists = $('set-lists');
   lists.innerHTML = '';
   for (const l of LISTS) {
@@ -1229,8 +1312,11 @@ $('set-wake').addEventListener('change', e => { state.settings.wakeLock = e.targ
 $('set-volume').addEventListener('input', e => { state.settings.voiceVolume = Number(e.target.value); audio.configure(state.settings); persist(); });
 $('set-volume').addEventListener('change', () => audio.say('word-the', 'the'));
 $('set-music').addEventListener('change', e => { state.settings.music = e.target.checked; persist(); audio.unlock(); music.setEnabled(e.target.checked); });
+$('set-crowns').addEventListener('change', e => { state.settings.crowns = e.target.checked; persist(); applyCrowns(); });
+// Crowns on/off (owner's daughter asked, 2026-11-04): the meadow, pets and egg pop-ups all follow it.
+function applyCrowns() { document.body.classList.toggle('no-crowns', state.settings.crowns === false); }
+applyCrowns();
 $('set-effects').addEventListener('change', e => { state.settings.effects = e.target.checked; audio.configure(state.settings); persist(); audio.chime.correct(); });
-document.querySelectorAll('#set-length button').forEach(b => b.addEventListener('click', () => { state.settings.sessionLength = b.dataset.len; persist(); renderSettings(); }));
 $('start-meet').addEventListener('click', () => { audio.unlock(); startSession('meet'); });
 
 $('export').addEventListener('click', () => {

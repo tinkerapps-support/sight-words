@@ -506,7 +506,9 @@ body.has-meadow .meadow-count { width: fit-content; margin: 0 auto; color: var(-
 .pet.held { z-index: 9999 !important; cursor: grabbing; }
 .pet.held .pet-body { animation: pet-held 0.3s ease-in-out infinite; }
 .pet.held .pet-shadow { transform: translateY(14px) scale(0.6); opacity: 0.5; }
-.pet.crowned::after { content: ''; width: 26px; height: 26px; background: url('../assets/art/ui-crown.webp') center / contain no-repeat; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); pointer-events: none; }
+/* The crown sits on the head and moves with the body (it hops, walks and swings with the friend). */
+.pet.crowned .pet-body::after { content: ''; width: 24px; height: 24px; background: url('../assets/art/ui-crown.webp') center / contain no-repeat; position: absolute; top: -5px; left: 50%; transform: translateX(-50%) rotate(-6deg); pointer-events: none; }
+body.no-crowns .pet.crowned .pet-body::after, body.no-crowns .friend.mastered::after, body.no-crowns .egg-pop-pic.crowned::after { display: none; }
 @keyframes pet-walk { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
 @keyframes pet-hop { 15% { transform: scale(1.15, 0.85); } 45% { transform: translateY(-34px) scale(0.92, 1.1); } 75% { transform: translateY(0) scale(1.12, 0.88); } 100% { transform: none; } }
 @keyframes pet-cheer { 30% { transform: translateY(-14px) rotate(-6deg); } 60% { transform: translateY(0) rotate(4deg); } 100% { transform: none; } }
@@ -604,10 +606,14 @@ input, textarea, select, .sync-code { -webkit-user-select: text; user-select: te
 .toy-swing .rope { position: absolute; top: 0; width: 2px; height: 68px; background: #a58bb5; }
 .toy-swing .rope.l { left: 6px; } .toy-swing .rope.r { right: 6px; }
 .toy-swing .board { position: absolute; bottom: 0; left: 0; right: 0; height: 9px; border-radius: 5px; background: #ffbf8f; }
-.toy-swing.active .t-seat { animation: swing 1.6s ease-in-out infinite; }
-.toy-swing.sway .t-seat { animation: swing 1.6s ease-in-out 1; }
-.pet.ride-swing .pet-body { transform-origin: 33px -14px; animation: swing 1.6s ease-in-out infinite; }
-@keyframes swing { 0%, 100% { transform: rotate(18deg); } 50% { transform: rotate(-18deg); } }
+/* The seat swings like a real one (owner, 2026-11-04: the ropes came off the bar): the rope tops stay
+   pinned to the bar and the seat stays level, moving in an arc (a skew from the top, not a rotation).
+   A rider moves with the seat board, on the same clock (--swing-delay, set in pets.js). */
+.toy-swing.active .t-seat, .toy-swing.sway .t-seat { animation: swing-seat 1.6s ease-in-out infinite var(--swing-delay, 0s); }
+.toy-swing.sway:not(.active) .t-seat { animation-iteration-count: 1; }
+.pet.ride-swing .pet-body { animation: swing-ride 1.6s ease-in-out infinite var(--swing-delay, 0s); }
+@keyframes swing-seat { 0%, 100% { transform: skewX(-18deg) scaleY(0.95); } 50% { transform: skewX(18deg) scaleY(0.95); } }
+@keyframes swing-ride { 0%, 100% { transform: translate(-21px, -3px); } 50% { transform: translate(21px, -3px); } }
 
 /* ball */
 .toy-ball .t-ball { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(#ff9ac4, #ffd98a, #9fe3c4, #9ec9ff, #c9a7e8, #ff9ac4); box-shadow: inset -4px -4px 0 rgba(0,0,0,0.08); }
@@ -712,3 +718,26 @@ input, textarea, select, .sync-code { -webkit-user-select: text; user-select: te
 .cal-stats dt { font-weight: 600; color: var(--ink); }
 .cal-stats dd { margin: 0; color: #6b5a70; }
 .cal-word { display: inline-block; font-family: 'Andika', sans-serif; font-size: 1.05rem; color: var(--ink); background: #f6eefa; border-radius: 6px; padding: 0 6px; margin: 1px 0; }
+
+/* Rainbows toward the next sticker (3 dots by the meter), and the sticker shown when earned */
+.rainbow-dots { display: flex; gap: 3px; align-items: center; }
+.rainbow-dots i { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.7); box-shadow: inset 0 0 0 2px #e2d6e8; }
+.rainbow-dots i.on { background: #ffd34d; box-shadow: none; }
+.rainbow-dots i.felt { background-color: transparent; background-position: center; background-size: contain; background-repeat: no-repeat; box-shadow: none; }
+.sticker-pop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 70; pointer-events: none; background: rgba(255, 240, 248, 0.88); animation: fadein 0.3s both; }
+.sticker-pop img, .sticker-pop span { width: 190px; height: 190px; object-fit: contain; font-size: 8rem; animation: sticker-in 0.6s cubic-bezier(.2,1.6,.4,1) both; filter: drop-shadow(0 8px 14px rgba(90,58,94,0.3)); }
+@keyframes sticker-in { from { transform: scale(0.2) rotate(-20deg); opacity: 0; } }
+.end-sticker.many img { width: 110px; height: 110px; }
+.end-sticker.next { animation: none; display: flex; flex-direction: column; align-items: center; }
+.end-sticker.next img { filter: grayscale(1) opacity(0.45); }
+.end-next { font-size: 1.1rem; font-weight: 700; color: var(--ink); background: #fff; border-radius: 999px; padding: 2px 14px; margin-top: -10px; }
+
+/* The break every 2 rainbows: meadow or keep reading */
+.break { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; padding: 16px; background: #fff0f7; animation: fadein 0.3s both; }
+.break-box { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(100%, 380px); text-align: center; }
+.break-box h2 { margin: 0; font-size: 2rem; color: var(--pink-deep); }
+.break-box .mascot { width: 140px; height: 140px; }
+.break-box .big-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.big-btn.soft { background: #fff; color: var(--ink); box-shadow: 0 6px 0 #e7d6ee, 0 10px 18px rgba(90,58,94,0.12); }
+.break-friend { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; font-size: 2rem; }
+.break-friend img { width: 100%; height: 100%; object-fit: contain; }

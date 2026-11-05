@@ -14,6 +14,7 @@ export const OTHER = {
   'session-end': 'You read so many words!',
   'rainbow-full': 'A whole rainbow!',
   'sticker': 'You earned a sticker!',
+  'break': 'Two rainbows! Back to the meadow, or keep reading?',
   'hatched': 'A new friend hatched!',
   'say-it-again': 'Can you say it too?',
   'new-word': "Here's a new word!",

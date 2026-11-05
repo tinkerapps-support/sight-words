@@ -47,6 +47,7 @@
     <header class="topbar">
       <button id="quit" class="icon-btn small" aria-label="Stop"><span class="glyph" data-icon="ui-close">✕</span></button>
       <div id="meter" class="meter" aria-hidden="true"></div>
+      <div id="rainbow-dots" class="rainbow-dots" aria-hidden="true"></div>
       <div id="play-mascot" class="mascot small idle">🦄</div>
     </header>
     <div class="card-wrap">
@@ -66,6 +67,15 @@
         </div>
       </div>
       <div id="burst" class="burst" aria-hidden="true"></div>
+      <div id="sticker-pop" class="sticker-pop" hidden aria-hidden="true"></div>
+      <div id="break" class="break" hidden>
+        <div class="break-box">
+          <div id="break-mascot" class="mascot cheer">🦄</div>
+          <h2>Two rainbows!</h2>
+          <button id="break-more" class="big-btn play"><span class="glyph" data-icon="ui-play">▶</span> Keep reading</button>
+          <button id="break-meadow" class="big-btn soft"><span id="break-friend" class="break-friend"></span> Back to the meadow</button>
+        </div>
+      </div>
       <div id="egg-pop" class="egg-pop" hidden aria-hidden="true">
         <div id="egg-pop-pic" class="egg-pop-pic"></div>
         <div id="egg-dots" class="egg-dots"></div>
@@ -115,15 +125,6 @@
   </section>
 
   <!-- End of a session -->
-  <section id="end-screen" class="screen" hidden>
-    <div class="end-box">
-      <div id="end-mascot" class="mascot cheer">🦄</div>
-      <h1 id="end-title">Great reading!</h1>
-      <div id="end-sticker" class="end-sticker"></div>
-      <div id="end-hatched" class="end-hatched"></div>
-      <button id="end-done" class="big-btn">Done</button>
-    </div>
-  </section>
 
   <!-- Sticker page -->
   <section id="sticker-screen" class="screen" hidden>
@@ -158,12 +159,7 @@
       <label class="setting col"><span>Voice volume</span><input type="range" id="set-volume" min="0" max="1" step="0.05"></label>
       <label class="setting"><span>Music</span><input type="checkbox" id="set-music" role="switch"></label>
       <label class="setting"><span>Sound effects</span><input type="checkbox" id="set-effects" role="switch"></label>
-      <div class="setting col">
-        <span>Game length</span>
-        <div class="seg" id="set-length">
-          <button data-len="short">Short</button><button data-len="normal">Normal</button><button data-len="long">Long</button>
-        </div>
-      </div>
+      <label class="setting"><span>Crowns on mastered friends</span><input type="checkbox" id="set-crowns" role="switch"></label>
       <button class="setting nav" data-go="calendar">Calendar: days and time played <span>›</span></button>
       <button class="setting nav" data-go="progress">Progress report <span>›</span></button>
       <button class="setting nav" id="start-meet">Meet the words (quick check) <span>›</span></button>
@@ -286,11 +282,15 @@
 
       <h3>A few tips</h3>
       <ul>
-        <li>One short game a day works better than a long one now and then. Coming back on another
-          day is what makes words stick.</li>
+        <li>A game has no set length. Every 2 full rainbows (about 14 right cards, 5 minutes or so)
+          your child chooses: back to the meadow, or keep reading. A little every day works better than
+          a lot now and then. Coming back on another day is what makes words stick.</li>
         <li>Stop while it's still fun. The <span class="glyph" data-icon="ui-close">✕</span> button ends a game early and keeps everything learned so far.</li>
         <li>Praise the trying, not only the right answers.</li>
-        <li>Every reading game earns a sticker, whatever happens.</li>
+        <li>Stickers come from rainbows: each right card fills one band of the rainbow at the top,
+          and every 3 full rainbows earn a sticker on the spot. The 3 dots next to the rainbow show
+          how many rainbows are done. A normal game fills about 2 rainbows, so a sticker comes about
+          every game and a half, and the rainbow carries over from one game to the next.</li>
       </ul>
 
       <h3>Putting it on a phone or tablet</h3>

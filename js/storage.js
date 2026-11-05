@@ -14,6 +14,7 @@ export function defaultState() {
     words: {},
     hatched: [],      // creatures stay hatched even if their word slips later
     meter: 0,
+    rainbows: 0,      // full rainbows toward the next sticker (0-2); per device, like the meter
     stickers: [],     // one per finished session: { t, id }
     sessions: [],     // { t, cards, correct, fast }
     checks: [],       // Word Check results: { t, right, total, missed, asked }
@@ -28,8 +29,8 @@ export function defaultState() {
       wakeLock: true,
       voiceVolume: 0.9,
       effects: true,
+      crowns: true,     // crowns on mastered friends (the child can ask for them off)
       music: true,
-      sessionLength: 'normal',
     },
   };
 }
@@ -50,6 +51,7 @@ export function normalize(raw) {
   for (const k of ['hatched', 'stickers', 'sessions', 'checks']) if (!Array.isArray(state[k])) state[k] = [];
   if (!state.resets || typeof state.resets !== 'object') state.resets = {};
   if (typeof state.resetAll !== 'number') state.resetAll = 0;
+  if (typeof state.rainbows !== 'number') state.rainbows = 0;
   if (!state.toysOpened || typeof state.toysOpened !== 'object') state.toysOpened = {};
   state.daily = normalizeDaily(state.daily);
   if (typeof state.dailySince !== 'number') state.dailySince = 0;

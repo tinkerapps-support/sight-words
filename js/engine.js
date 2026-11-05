@@ -84,7 +84,7 @@ export function nextStep(rec, now) {
     const day = new Date(crownAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     return `Hatched! A Fast read from ${day} earns the crown`;
   }
-  return 'Mastered';
+  return rec.doubt ? 'Mastered · missed last time: one right read clears it' : 'Mastered';
 }
 
 // Missed CONFIG.restAfterMisses times in one game: rest it until tomorrow so a hard word
@@ -118,10 +118,17 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
     rec.popStreak = 0;
     rec.fastStreak = 0;
     rec.reviewIdx = 0;
-    const to = DROP_TO[rec.level];
-    if (to !== rec.level) setLevel(rec, to, now);
+    // A crowned word keeps its crown on a first miss and is checked every round until she reads it
+    // right (owner, 2026-11-04). A second miss in a row drops it as usual.
+    if (rec.level === 5 && !rec.doubt) rec.doubt = 1;
+    else {
+      rec.doubt = 0;
+      const to = DROP_TO[rec.level];
+      if (to !== rec.level) setLevel(rec, to, now);
+    }
     rec.nextDue = now;
   } else {
+    rec.doubt = 0;
     rec.correctStreak++;
     rec.fastStreak = r === 'fast' ? rec.fastStreak + 1 : 0;
     if (rec.level === 0) setLevel(rec, 1, now);
@@ -161,7 +168,7 @@ export function applyResult(rec, result, { hinted = false, ms = 0, now }) {
 export function cardKind(rec, rng = Math.random, word) {
   if (needsIntro(rec)) return 'intro';
   if (rec.level <= 1) return 'pop';
-  if (rec.level <= 3) return 'read';
+  if (rec.level <= 3 || rec.doubt) return 'read';   // a missed crowned word is checked by reading
   const r = rng();
   if (!spellable(word)) return r < CONFIG.popShareBuilt ? 'pop' : 'read';
   if (!rec.built) return r < CONFIG.buildShareUnbuilt ? 'build' : 'read';
@@ -197,12 +204,14 @@ export function applyPop(rec, firstTry, now, picked) {
   if (!firstTry) {
     rec.misses++;
     rec.popStreak = 0;
+    if (rec.level === 5) rec.doubt = 1;   // a wrong bubble on a crowned word: check it again soon
   } else if (rec.level === 1 && ++rec.popStreak >= CONFIG.popsToLearn) {
     setLevel(rec, 2, now);
     rec.popStreak = 0;
     rec.correctStreak = 0;
     rec.fastStreak = 0;
   }
+  if (firstTry) rec.doubt = 0;
   rec.nextDue = now;
   return { before, after: rec.level };
 }
@@ -323,6 +332,15 @@ export function buildSession({ records, entries, now, length, rng = Math.random,
     return da ? rec(a).nextDue - rec(b).nextDue : rec(a).lastSeen - rec(b).lastSeen;
   };
   let pool = known.slice().sort(byDueThenSeen);
+  // Crowned words (owner, 2026-11-04): a spot check now and then, about 1 round in
+  // CONFIG.masteredChance, so mastery keeps being checked without much repetition. One she missed
+  // (rec.doubt) comes every round until she reads it right. Resting ones also fill in when there
+  // are too few other known words.
+  const crowned = pool.filter(w => level(w) === 5);
+  const others = pool.filter(w => level(w) !== 5);
+  const checked = crowned.filter(w => rec(w).doubt > 0 || rng() < CONFIG.masteredChance);
+  const resting = crowned.filter(w => !checked.includes(w));
+  pool = [...checked, ...others, ...resting.slice(0, Math.max(0, CONFIG.minFillers - others.length - checked.length))];
   if (starterMode) {
     const extra = words.filter(w => isStarter.has(w) && level(w) < 3 && !targets.includes(w));
     pool = pool.concat(extra.sort((a, b) => level(b) - level(a)));

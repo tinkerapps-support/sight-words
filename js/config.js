@@ -1,6 +1,10 @@
 // Every tuning number for the learning engine and the hints, in one place (PLAN.md §3, §4, §10).
 export const CONFIG = {
-  sessionLength: { short: 8, normal: 15, long: 20 },
+  // A game has no set length (owner, 2026-11-04): it runs in rounds of this many cards, and every
+  // rainbowsPerBreak full rainbows she chooses the meadow or more reading.
+  roundLength: 15,
+  rainbowsPerBreak: 2,
+  spellRate: 1.3,            // letters are played this much faster when a word is spelled out
   starterSessionLength: 8,   // used until enough words are level 3+
   minKnownForFull: 4,        // level 3+ words needed to leave starter mode
   maxShaky: 3,               // never more than this many words at level 1–2
@@ -13,7 +17,10 @@ export const CONFIG = {
   restAfterMisses: 3,        // misses in one game before a word rests until tomorrow
   promoteKnownAfterDays: 3,  // level 4 → 5 needs a Fast review this long after reaching 4
   reviewGapsDays: [1, 3, 7, 14, 30],
+  minFillers: 4,             // known words a round needs between targets; resting mastered words only fill a gap below this
+  masteredChance: 0.1,       // a crowned word comes back in about 1 round in 10 (missed: every round until read right)
   meterBands: 7,
+  rainbowsPerSticker: 3,     // every 3rd full rainbow earns a sticker on the spot (owner, 2026-11-04)
   clozePauseMs: 1700,
   yourTurnMs: 4000,          // quiet time for her to say it back (after "Your turn!", teaching, Say it)        // the pause where the word goes when a hint sentence is read
   historyCap: 60,

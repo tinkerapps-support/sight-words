@@ -116,6 +116,7 @@ export const VOICE_CLIPS = {
  "session-end": "session-end.mp3",
  "rainbow-full": "rainbow-full.mp3",
  "sticker": "sticker.mp3",
+ "break": "break.mp3",
  "hatched": "hatched.mp3",
  "say-it-again": "say-it-again.mp3",
  "new-word": "new-word.mp3",

@@ -292,7 +292,7 @@ function anim(el, cls) {
 function poke(t) {
   switch (t.kind) {
     case 'ball': kickBall(t); break;
-    case 'swing': anim(t.el, 'sway'); audio.chime.whoosh(); break;
+    case 'swing': if (!t.el.classList.contains('active')) t.el.style.removeProperty('--swing-delay'); anim(t.el, 'sway'); audio.chime.whoosh(); break;
     case 'slide': anim(t.el, 'wiggle'); audio.chime.whoosh(); break;
     case 'trampoline': anim(t.el, 'boing'); audio.chime.pop(); break;
     case 'seesaw': anim(t.el, 'tip'); audio.chime.tap(); break;
@@ -334,6 +334,12 @@ function startPlay(p, t, slot) {
     p.kicks = 3;
     setMode(p, 'kick', 350);
     return;
+  }
+  // The swing seat and its rider share one clock, so the friend stays on the seat.
+  if (t.kind === 'swing') {
+    const d = `${-(performance.now() % 1600)}ms`;
+    t.el.style.setProperty('--swing-delay', d);
+    p.el.style.setProperty('--swing-delay', d);
   }
   p.el.classList.add(`ride-${t.kind}`, `slot-${slot}`);
   t.el.classList.add('active');

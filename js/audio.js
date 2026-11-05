@@ -115,6 +115,7 @@ let pending = null;
 
 // opts.onTime(seconds, duration) is called every frame while the line plays (word highlighting).
 // opts.now skips the gap: for a line the child or parent asked for with a tap ("Hear it").
+// opts.rate plays a clip faster (letters when spelling a word out; pitch is kept).
 export function say(id, text, opts = {}) {
   stop();
   if (volume <= 0) return Promise.resolve();
@@ -156,6 +157,7 @@ function play(id, text, resolve, opts) {
       if (!audio.src.endsWith(url)) audio.src = url;
       else audio.currentTime = 0;
       audio.volume = volume;
+      audio.playbackRate = opts.rate || 1;
       audio.onended = done;
       // Fall back to device speech only if the clip itself can't play: a clip cut off by the next
       // line (pause() → AbortError) must stay cut off, not be re-read in the robotic voice.
